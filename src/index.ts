@@ -77,7 +77,26 @@ const allCQL = [mainCQLPath, ...deps];
 
 async function main(): Promise<fhir4.Bundle> {
   const mainLibraryId = getMainLibraryId(fs.readFileSync(mainCQLPath, 'utf8'));
-  const elm = await getELM(allCQL, opts.translatorUrl);
+  let elm: any[];
+  try {
+    const [result, errors] = await getELM(allCQL, opts.translatorUrl);
+
+    if (result == null) {
+      console.error(`Error translating CQL:`);
+      console.error(errors);
+      process.exit(1);
+    }
+    elm = result;
+  } catch (e: any) {
+    console.error(`HTTP error translating CQL: ${e.message}`);
+    console.error(e.stack);
+
+    if (e.response?.data) {
+      console.log(e.response.data);
+    }
+
+    process.exit(1);
+  }
 
   if (!mainLibraryId) {
     console.error(`Could not locate main library ID in ${mainCQLPath}`);

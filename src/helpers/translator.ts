@@ -22,7 +22,7 @@ function processErrors(elm: any): any[] {
   if (elm.library.annotation) {
     elm.library.annotation.forEach((a: any) => {
       if (a.errorSeverity === 'error') {
-        errors.push(a as object);
+        errors.push(a);
       }
     });
   }
@@ -30,29 +30,25 @@ function processErrors(elm: any): any[] {
   return errors;
 }
 
-export async function getELM(cqlPaths: string[], translatorUrl: string): Promise<any[]> {
-  try {
-    const client = new Client(`${translatorUrl}?annotations=true&locators=true`);
-    const librariesOrError = await translateCQL(cqlPaths, client);
+export async function getELM(
+  cqlPaths: string[],
+  translatorUrl: string
+): Promise<[any[] | null, any[] | null]> {
+  const client = new Client(`${translatorUrl}?annotations=true&locators=true`);
+  const librariesOrError = await translateCQL(cqlPaths, client);
 
-    if (librariesOrError instanceof Error) throw librariesOrError;
+  if (librariesOrError instanceof Error) throw librariesOrError;
 
-    const allELM: any[] = [];
-    Object.values(librariesOrError).forEach(elm => {
-      const errors = processErrors(elm as any);
-      if (errors.length === 0) {
-        allELM.push(elm as any);
-      } else {
-        console.error('Error translating to ELM');
-        console.error(errors);
-        process.exit(1);
-      }
-    });
-
-    return allELM;
-  } catch (e: any) {
-    console.error(`HTTP error translating CQL: ${e.message}`);
-    console.error(e.stack);
-    process.exit(1);
+  const allELM: any[] = [];
+  for (const key in librariesOrError) {
+    const elm = librariesOrError[key];
+    const errors = processErrors(elm as any);
+    if (errors.length === 0) {
+      allELM.push(elm as any);
+    } else {
+      return [null, errors];
+    }
   }
+
+  return [allELM, null];
 }

@@ -1,0 +1,78 @@
+{
+  "library": {
+    "annotation": [
+      {
+        "translatorOptions": "EnableAnnotations,EnableLocators",
+        "type": "CqlToElmInfo"
+      },
+      {
+        "type": "Annotation",
+        "s": {
+          "r": "2",
+          "s": [
+            {
+              "value": [
+                "",
+                "library SimpleLibraryDependency version '0.0.1'"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "identifier": {
+      "id": "SimpleLibraryDependency",
+      "version": "0.0.1"
+    },
+    "schemaIdentifier": {
+      "id": "urn:hl7-org:elm",
+      "version": "r1"
+    },
+    "usings": {
+      "def": [
+        {
+          "localIdentifier": "System",
+          "uri": "urn:hl7-org:elm-types:r1"
+        }
+      ]
+    },
+    "statements": {
+      "def": [
+        {
+          "localId": "2",
+          "locator": "3:1-4:6",
+          "name": "noop",
+          "context": "Patient",
+          "accessLevel": "Public",
+          "annotation": [
+            {
+              "type": "Annotation",
+              "s": {
+                "r": "2",
+                "s": [
+                  {
+                    "r": "1",
+                    "value": [
+                      "",
+                      "define ",
+                      "\"noop\"",
+                      ":\n  ",
+                      "true"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "expression": {
+            "localId": "1",
+            "locator": "4:3-4:6",
+            "valueType": "{urn:hl7-org:elm-types:r1}Boolean",
+            "value": "true",
+            "type": "Literal"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -22,15 +22,17 @@ export function getDependencyInfo(elm: any): ELMIdentification[] {
 }
 
 export function findELMByIdentifier(identifier: ELMIdentification, elm: any[]): any {
-  return elm.find(e => {
-    let criteria = e.library.identifier.id === identifier.id;
+  return (
+    elm.find(e => {
+      let criteria = e.library.identifier.id === identifier.id;
 
-    if (identifier.version) {
-      criteria = criteria && e.library.identifier.version === identifier.version;
-    }
+      if (identifier.version) {
+        criteria = criteria && e.library.identifier.version === identifier.version;
+      }
 
-    return criteria;
-  });
+      return criteria;
+    }) ?? null
+  );
 }
 
 export function getValueSetInfo(elm: any): string[] {
