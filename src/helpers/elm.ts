@@ -3,32 +3,22 @@ export interface ELMIdentification {
   version?: string;
 }
 
-export function getDependencyInfo(mainELM: any, allELM: any[]): ELMIdentification[] {
-  const deps: ELMIdentification[] = [];
-  if (mainELM.library.includes?.def) {
-    mainELM.library.includes.def.forEach((def: any) => {
-      deps.push({
-        id: def.path,
-        ...(def.version ? { version: def.version } : {})
-      });
+export function getDependencyInfo(elm: any): ELMIdentification[] {
+  if (elm.library.includes?.def) {
+    const deps: ELMIdentification[] = elm.library.includes.def.map((i: any) => ({
+      id: i.path,
+      ...(i.version ? { version: i.version } : {})
+    }));
 
-      const dep = allELM.find(
-        e =>
-          e.library.identifier.id === def.path &&
-          (def.version ? def.version === e.library.identifier.version : true)
-      );
-
-      if (!dep) {
-        throw new Error(
-          `Could not resolve dependency ${def.path}|${def.version} in dependency array`
-        );
-      }
-
-      deps.push(...getDependencyInfo(dep, allELM));
-    });
+    return deps.filter(
+      (d, i) =>
+        deps.findIndex(
+          dep => dep.id === d.id && (dep.version ? dep.version === d.version : true)
+        ) === i
+    );
   }
 
-  return deps;
+  return [];
 }
 
 export function findELMByIdentifier(identifier: ELMIdentification, elm: any[]): any {

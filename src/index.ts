@@ -11,12 +11,7 @@ import {
   Scoring,
   generateValueSetRelatedArtifact
 } from './helpers/fhir';
-import {
-  ELMIdentification,
-  findELMByIdentifier,
-  getDependencyInfo,
-  getValueSetInfo
-} from './helpers/elm';
+import { findELMByIdentifier, getDependencyInfo, getValueSetInfo } from './helpers/elm';
 
 const program = new Command();
 
@@ -98,30 +93,21 @@ async function main(): Promise<fhir4.Bundle> {
     opts.canonicalBase
   );
 
-  let mainLibDeps: ELMIdentification[] = [];
-  try {
-    mainLibDeps = getDependencyInfo(mainLibELM, elm);
-  } catch (e: any) {
-    console.error(e.message);
-    process.exit(1);
-  }
-
-  library.relatedArtifact = mainLibDeps
-    .filter((d, i) => mainLibDeps.findIndex(mld => mld.id === d.id) === i)
-    .map(dep => generateLibraryRelatedArtifact(dep, elm));
+  const mainLibDeps = getDependencyInfo(mainLibELM);
+  library.relatedArtifact = mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm));
 
   library.relatedArtifact.push(
     ...getValueSetInfo(mainLibELM).map(vs => generateValueSetRelatedArtifact(vs))
   );
+
+  console.log(mainLibDeps);
 
   const remainingDeps = elm.filter(e => e.library.identifier.id !== mainLibraryId);
 
   const depLibraries = remainingDeps.map(d => ({
     ...generateLibraryResource(`library-${d.library.identifier.id}`, d, opts.canonicalBase),
     relatedArtifact: [
-      ...getDependencyInfo(d, remainingDeps).map(dep =>
-        generateLibraryRelatedArtifact(dep, remainingDeps)
-      ),
+      ...getDependencyInfo(d).map(dep => generateLibraryRelatedArtifact(dep, remainingDeps)),
       ...getValueSetInfo(d).map(vs => generateValueSetRelatedArtifact(vs))
     ]
   }));
