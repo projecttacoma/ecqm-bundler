@@ -12,17 +12,24 @@ export enum Scoring {
   COHORT = 'cohort'
 }
 
+export enum PopulationCode {
+  IPOP = 'initial-population',
+  NUMER = 'numerator',
+  DENOM = 'denominator'
+}
+
 export function generateMeasureResource(
   measureId: string,
   libraryId: string,
   improvementNotation: ImprovementNotation,
   scoringCode: Scoring,
-  canonicalBase: string
+  canonicalBase: string,
+  populationCodes: { [key in PopulationCode]: string }
 ): fhir4.Measure {
-  return {
+  const measure: fhir4.Measure = {
     resourceType: 'Measure',
     id: measureId,
-    url: `${canonicalBase}/Measure/${measureId}`,
+    url: new URL(`/Measure/${measureId}`, canonicalBase).toString(),
     status: 'draft',
     library: [`Library/${libraryId}`],
     improvementNotation: {
@@ -40,8 +47,59 @@ export function generateMeasureResource(
           code: scoringCode
         }
       ]
-    }
+    },
+    group: [
+      {
+        population: [
+          {
+            code: {
+              coding: [
+                {
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-population',
+                  code: PopulationCode.IPOP
+                }
+              ]
+            },
+            criteria: {
+              language: 'text/cql',
+              expression: populationCodes[PopulationCode.IPOP]
+            }
+          },
+          {
+            code: {
+              coding: [
+                {
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-population',
+                  code: PopulationCode.DENOM
+                }
+              ]
+            },
+            criteria: {
+              language: 'text/cql',
+              expression: populationCodes[PopulationCode.DENOM]
+            }
+          },
+
+          {
+            code: {
+              coding: [
+                {
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-population',
+                  code: PopulationCode.NUMER
+                }
+              ]
+            },
+            criteria: {
+              language: 'text/cql',
+              expression: populationCodes[PopulationCode.NUMER]
+            }
+          }
+        ]
+      }
+    ]
   };
+
+  return measure;
 }
 
 export function generateLibraryResource(
@@ -52,7 +110,7 @@ export function generateLibraryResource(
   return {
     resourceType: 'Library',
     id: libraryId,
-    url: `${canonicalBase}/Library/${libraryId}`,
+    url: new URL(`/Library/${libraryId}`, canonicalBase).toString(),
     version: elm.library.identifier.version || '0.0.1',
     type: {
       coding: [

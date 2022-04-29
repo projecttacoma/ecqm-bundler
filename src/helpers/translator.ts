@@ -1,13 +1,8 @@
 import fs from 'fs';
-import dotenv from 'dotenv';
 import path from 'path';
 import translationService, { Client } from 'cql-translation-service-client';
 
-dotenv.config();
-
-const client = new Client(`${process.env.TRANSLATOR_URL}?annotations=true&locators=true`);
-
-async function translateCQL(paths: string[]): Promise<any> {
+async function translateCQL(paths: string[], client: Client): Promise<any> {
   const cqlRequestBody: translationService.CqlLibraries = {};
 
   paths.forEach(f => {
@@ -35,9 +30,10 @@ function processErrors(elm: any): any[] {
   return errors;
 }
 
-export async function getELM(cqlPaths: string[]): Promise<any[]> {
+export async function getELM(cqlPaths: string[], translatorUrl: string): Promise<any[]> {
   try {
-    const librariesOrError = await translateCQL(cqlPaths);
+    const client = new Client(`${translatorUrl}?annotations=true&locators=true`);
+    const librariesOrError = await translateCQL(cqlPaths, client);
 
     if (librariesOrError instanceof Error) throw librariesOrError;
 
@@ -59,16 +55,4 @@ export async function getELM(cqlPaths: string[]): Promise<any[]> {
     console.error(e.stack);
     process.exit(1);
   }
-}
-
-export function getMainLibraryId(cql: string): string | null {
-  const re = /library ([a-zA-Z0-9_]+)( version .*)?/g;
-
-  const matches = re.exec(cql);
-
-  if (matches) {
-    return matches[1];
-  }
-
-  return null;
 }

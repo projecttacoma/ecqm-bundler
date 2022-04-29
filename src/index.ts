@@ -1,7 +1,9 @@
+#!/usr/bin/env node
+
 import fs from 'fs';
 import path from 'path';
 import { Command, Option } from 'commander';
-import { getELM, getMainLibraryId } from './helpers/translator';
+import { getELM } from './helpers/translator';
 import {
   generateLibraryResource,
   generateMeasureBundle,
@@ -9,20 +11,31 @@ import {
   generateLibraryRelatedArtifact,
   ImprovementNotation,
   Scoring,
-  generateValueSetRelatedArtifact
+  generateValueSetRelatedArtifact,
+  PopulationCode
 } from './helpers/fhir';
 import { findELMByIdentifier, getDependencyInfo, getValueSetInfo } from './helpers/elm';
+import { getMainLibraryId } from './helpers/cql';
 
 const program = new Command();
 
 program
   .requiredOption('-c, --cql-file <path>')
   .addOption(
-    new Option('-d, --deps <deps...>', 'List of CQL dependency files of the main file').default([])
+    new Option('--deps <deps...>', 'List of CQL dependency files of the main file').default([])
   )
   .option('--deps-directory <path>', 'Directory containing all dependent CQL files')
-  .option('-o, --out <path>', 'Relative path to output file', './measure-bundle.json')
+  .option('-n,--numer <expr>', 'Numerator expression name of measure', 'Numerator')
+  .option('-i,--ipop <expr>', 'Numerator expression name of measure', 'Initial Population')
+  .option('-d,--denom <expr>', 'Denominator expression name of measure', 'Denominator')
+  .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
   .option('-v, --valuesets <path>', 'Path to directory containing necessary valueset resource')
+  .option('--no-valuesets', 'Disable valueset detection and bundling')
+  .option(
+    '-u, --translator-url <url>',
+    'URL of cql translation service to use',
+    'http://localhost:8080/cql/translator'
+  )
   .option(
     '--canonical-base <url>',
     'Base URL to use for the canonical URLs of library and measure resources',
@@ -47,24 +60,24 @@ if (opts.deps.length !== 0 && opts.depsDirectory) {
   program.help();
 }
 
-let deps = [];
+let deps: string[] = [];
 
 if (opts.deps.length > 0) {
-  deps = opts.deps.map((d: string) => path.join(process.cwd(), d));
+  deps = opts.deps.map((d: string) => path.resolve(d));
 } else if (opts.depsDirectory) {
-  const depsBasePath = path.join(process.cwd(), opts.depsDirectory);
+  const depsBasePath = path.resolve(opts.depsDirectory);
   deps = fs
     .readdirSync(opts.depsDirectory)
     .filter(f => path.extname(f) === '.cql' && f !== path.basename(opts.cqlFile))
     .map(f => path.join(depsBasePath, f));
 }
 
-const mainCQLPath = path.join(process.cwd(), opts.cqlFile);
+const mainCQLPath = path.resolve(opts.cqlFile);
 const allCQL = [mainCQLPath, ...deps];
 
 async function main(): Promise<fhir4.Bundle> {
   const mainLibraryId = getMainLibraryId(fs.readFileSync(mainCQLPath, 'utf8'));
-  const elm = await getELM(allCQL);
+  const elm = await getELM(allCQL, opts.translatorUrl);
 
   if (!mainLibraryId) {
     console.error(`Could not locate main library ID in ${mainCQLPath}`);
@@ -90,17 +103,20 @@ async function main(): Promise<fhir4.Bundle> {
     libraryFHIRId,
     opts.improvementNotation,
     opts.scoringCode,
-    opts.canonicalBase
+    opts.canonicalBase,
+    {
+      [PopulationCode.IPOP]: opts.ipop,
+      [PopulationCode.NUMER]: opts.numer,
+      [PopulationCode.DENOM]: opts.denom
+    }
   );
 
   const mainLibDeps = getDependencyInfo(mainLibELM);
-  library.relatedArtifact = mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm));
 
-  library.relatedArtifact.push(
+  library.relatedArtifact = [
+    ...mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm)),
     ...getValueSetInfo(mainLibELM).map(vs => generateValueSetRelatedArtifact(vs))
-  );
-
-  console.log(mainLibDeps);
+  ];
 
   const remainingDeps = elm.filter(e => e.library.identifier.id !== mainLibraryId);
 
@@ -112,24 +128,28 @@ async function main(): Promise<fhir4.Bundle> {
     ]
   }));
 
-  const allValueSets = elm.map(e => getValueSetInfo(e)).flat();
   const vsResources: fhir4.ValueSet[] = [];
 
-  if (allValueSets.length > 0) {
-    if (!opts.valuesets) {
-      console.error(
-        `Library ${mainLibraryId} uses valuesets, but -v/--valuesets directory not provided`
-      );
-      program.help();
-    }
+  if (opts.valuesets) {
+    const allValueSets = elm.map(e => getValueSetInfo(e)).flat();
 
-    const vsBasePath = path.join(process.cwd(), opts.valuesets);
-    fs.readdirSync(vsBasePath).forEach(f => {
-      const vs = JSON.parse(fs.readFileSync(path.join(vsBasePath, f), 'utf8')) as fhir4.ValueSet;
-      if (vs.url && allValueSets.includes(vs.url)) {
-        vsResources.push(vs);
+    if (allValueSets.length > 0) {
+      if (!opts.valuesets) {
+        console.error(
+          `Library ${mainLibraryId} uses valuesets, but -v/--valuesets directory not provided`
+        );
+        program.help();
       }
-    });
+
+      const vsBasePath = path.resolve(opts.valuesets);
+
+      fs.readdirSync(vsBasePath).forEach(f => {
+        const vs = JSON.parse(fs.readFileSync(path.join(vsBasePath, f), 'utf8')) as fhir4.ValueSet;
+        if (vs.url && allValueSets.includes(vs.url)) {
+          vsResources.push(vs);
+        }
+      });
+    }
   }
 
   return generateMeasureBundle([measure, library, ...depLibraries, ...vsResources]);
