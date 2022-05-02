@@ -61,7 +61,7 @@ if (opts.deps.length !== 0 && opts.depsDirectory) {
   program.help();
 }
 
-if (!opts.valuesets) {
+if (opts.valuesets === false) {
   logger.warn(
     'Configured bundler to not resolve ValueSet resources. Resulting Bundle may be incomplete'
   );
@@ -168,15 +168,16 @@ async function main(): Promise<fhir4.Bundle> {
 
   const vsResources: fhir4.ValueSet[] = [];
 
-  if (opts.valuesets) {
+  if (opts.valuesets !== false) {
     logger.info(`Resolving ValueSets`);
     const allValueSets = elm.map(e => getValueSetInfo(e)).flat();
 
     if (allValueSets.length > 0) {
       if (!opts.valuesets) {
-        console.error(
+        logger.error(
           `Library ${mainLibraryId} uses valuesets, but -v/--valuesets directory not provided`
         );
+        logger.info('To disable ValueSet resolution, use --no-valuesets');
         program.help();
       }
 
