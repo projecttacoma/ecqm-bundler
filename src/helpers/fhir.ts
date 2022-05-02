@@ -1,4 +1,5 @@
 import { ELMIdentification, findELMByIdentifier } from './elm';
+import logger from './logger';
 
 export enum ImprovementNotation {
   POSITIVE = 'positive',
@@ -26,7 +27,9 @@ export function generateMeasureResource(
   canonicalBase: string,
   populationCodes: { [key in PopulationCode]: string }
 ): fhir4.Measure {
-  const measure: fhir4.Measure = {
+  logger.info(`Created Measure/${measureId}`);
+
+  return {
     resourceType: 'Measure',
     id: measureId,
     url: new URL(`/Measure/${measureId}`, canonicalBase).toString(),
@@ -98,8 +101,6 @@ export function generateMeasureResource(
       }
     ]
   };
-
-  return measure;
 }
 
 export function generateLibraryResource(
@@ -107,6 +108,7 @@ export function generateLibraryResource(
   elm: any,
   canonicalBase: string
 ): fhir4.Library {
+  logger.info(`Creating Library/${libraryId}`);
   return {
     resourceType: 'Library',
     id: libraryId,

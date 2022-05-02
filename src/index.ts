@@ -16,6 +16,7 @@ import {
 } from './helpers/fhir';
 import { findELMByIdentifier, getDependencyInfo, getValueSetInfo } from './helpers/elm';
 import { getMainLibraryId } from './helpers/cql';
+import logger from './helpers/logger';
 
 const program = new Command();
 
@@ -60,7 +61,15 @@ if (opts.deps.length !== 0 && opts.depsDirectory) {
   program.help();
 }
 
+if (!opts.valuesets) {
+  logger.warn(
+    'Configured bundler to not resolve ValueSet resources. Resulting Bundle may be incomplete'
+  );
+}
+
 let deps: string[] = [];
+
+logger.info('Gathering dependencies');
 
 if (opts.deps.length > 0) {
   deps = opts.deps.map((d: string) => path.resolve(d));
@@ -72,23 +81,28 @@ if (opts.deps.length > 0) {
     .map(f => path.join(depsBasePath, f));
 }
 
+logger.info(`Successfully gathered ${deps.length} dependencies`);
+
 const mainCQLPath = path.resolve(opts.cqlFile);
 const allCQL = [mainCQLPath, ...deps];
+
+logger.info(`Using ${mainCQLPath} as main library`);
 
 async function main(): Promise<fhir4.Bundle> {
   const mainLibraryId = getMainLibraryId(fs.readFileSync(mainCQLPath, 'utf8'));
   let elm: any[];
   try {
+    logger.info('Translating all CQL');
     const [result, errors] = await getELM(allCQL, opts.translatorUrl);
 
     if (result == null) {
-      console.error(`Error translating CQL:`);
+      logger.error('Error translating CQL:');
       console.error(errors);
       process.exit(1);
     }
     elm = result;
   } catch (e: any) {
-    console.error(`HTTP error translating CQL: ${e.message}`);
+    logger.error(`HTTP error translating CQL: ${e.message}`);
     console.error(e.stack);
 
     if (e.response?.data) {
@@ -99,7 +113,7 @@ async function main(): Promise<fhir4.Bundle> {
   }
 
   if (!mainLibraryId) {
-    console.error(`Could not locate main library ID in ${mainCQLPath}`);
+    logger.error(`Could not locate main library ID in ${mainCQLPath}`);
     process.exit(1);
   }
 
@@ -117,8 +131,11 @@ async function main(): Promise<fhir4.Bundle> {
 
   const libraryFHIRId = `library-${mainLibraryId}`;
   const library = generateLibraryResource(libraryFHIRId, mainLibELM, opts.canonicalBase);
+
+  const measureFHIRId = `measure-${mainLibraryId}`;
+
   const measure = generateMeasureResource(
-    `measure-${mainLibraryId}`,
+    measureFHIRId,
     libraryFHIRId,
     opts.improvementNotation,
     opts.scoringCode,
@@ -129,6 +146,8 @@ async function main(): Promise<fhir4.Bundle> {
       [PopulationCode.DENOM]: opts.denom
     }
   );
+
+  logger.info('Resolving dependencies/relatedArtifact');
 
   const mainLibDeps = getDependencyInfo(mainLibELM);
 
@@ -150,6 +169,7 @@ async function main(): Promise<fhir4.Bundle> {
   const vsResources: fhir4.ValueSet[] = [];
 
   if (opts.valuesets) {
+    logger.info(`Resolving ValueSets`);
     const allValueSets = elm.map(e => getValueSetInfo(e)).flat();
 
     if (allValueSets.length > 0) {
@@ -163,9 +183,14 @@ async function main(): Promise<fhir4.Bundle> {
       const vsBasePath = path.resolve(opts.valuesets);
 
       fs.readdirSync(vsBasePath).forEach(f => {
-        const vs = JSON.parse(fs.readFileSync(path.join(vsBasePath, f), 'utf8')) as fhir4.ValueSet;
-        if (vs.url && allValueSets.includes(vs.url)) {
-          vsResources.push(vs);
+        if (path.extname(f) === '.json') {
+          const vs = JSON.parse(
+            fs.readFileSync(path.join(vsBasePath, f), 'utf8')
+          ) as fhir4.ValueSet;
+          if (vs.url && allValueSets.includes(vs.url)) {
+            logger.info(`Found ValueSet ${vs.url}`);
+            vsResources.push(vs);
+          }
         }
       });
     }
@@ -176,5 +201,5 @@ async function main(): Promise<fhir4.Bundle> {
 
 main().then(bundle => {
   fs.writeFileSync(opts.out, JSON.stringify(bundle, null, 2), 'utf8');
-  console.log(`Wrote file to ${opts.out}`);
+  logger.info(`Wrote file to ${opts.out}`);
 });

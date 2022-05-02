@@ -1,16 +1,16 @@
 {
   "name": "ecqm-bundler",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "CLI for bundling FHIR-based eCQMs",
   "main": "dist/index.js",
   "bin": {
-    "ecqm-bundle": "dist/index.js"
+    "ecqm-bundler": "dist/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:test-data": "ts-node test/fixtures/genTestData.ts",
-    "lint": "tsc && eslint \"**/*.{js,ts}\"",
-    "lint:fix": "tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
+    "lint": "npm run build && eslint \"**/*.{js,ts}\"",
+    "lint:fix": "npm run build -- --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
     "prepare": "npm run build",
     "prettier": "prettier --check \"**/*.{js,ts}\"",
     "prettier:fix": "prettier --write \"**/*.{js,ts}\"",
@@ -23,6 +23,7 @@
     "@types/fhir": "0.0.34",
     "@types/jest": "^27.4.1",
     "@types/node": "^17.0.29",
+    "@types/winston": "^2.4.4",
     "@typescript-eslint/eslint-plugin": "^5.21.0",
     "@typescript-eslint/parser": "^5.21.0",
     "eslint": "^8.14.0",
@@ -34,6 +35,7 @@
   },
   "dependencies": {
     "commander": "^9.2.0",
-    "cql-translation-service-client": "^0.6.1"
+    "cql-translation-service-client": "^0.6.1",
+    "winston": "^3.7.2"
   }
 }

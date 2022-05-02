@@ -8,7 +8,11 @@ const simpleLibraryCQL = path.join(__dirname, './SimpleLibrary.cql');
 const simpleLibraryDependencyCQL = path.join(__dirname, './SimpleLibraryDependency.cql');
 
 getELM([simpleLibraryCQL, simpleLibraryDependencyCQL], TRANSLATOR_URL)
-  .then(elm => {
+  .then(([elm, errors]) => {
+    if (elm == null || errors != null) {
+      throw new Error(`Error translating ELM: ${JSON.stringify(errors)}`);
+    }
+
     elm.forEach(lib => {
       const p = path.join(__dirname, `./${lib.library.identifier.id}.json`);
       fs.writeFileSync(p, JSON.stringify(lib, null, 2), 'utf8');
