@@ -12,7 +12,9 @@ npm install -g ecqm-bundler
 
 # Usage
 
-Must have an instance of the [cql-translation-service](https://github.com/cqframework/cql-translation-service) running somewhere.
+For bundling with CQL files as input, you must have an instance of the [cql-translation-service](https://github.com/cqframework/cql-translation-service) running somewhere.
+
+Bundling is also supported with JSON ELM content directly. See [Bundling from ELM Content](#bundling-from-elm-content)
 
 ## Basic Usage
 
@@ -27,6 +29,14 @@ ecqm-bundler -c /path/to/main/cql/file.cql --deps /path/to/dep1.cql /path/to/dep
 ``` bash
 ecqm-bundler -c /path/to/main/cql/file.cql --deps-directory /path/to/deps/directory -v /path/to/valueset/directory
 ```
+
+### Bundling from ELM Content
+
+``` bash
+ecqm-bundler -e /path/to/main/elm/file.json --deps-directory /path/to/deps/directory -v /path/to/valueset/directory
+```
+
+This will forego the CQL translation and bundle the libraries with the ELM content provided.
 
 ## Advanced Usage/Features
 
@@ -65,6 +75,13 @@ By default, the bundler just uses an `example.com` URL as the base canonical URL
 ecqm-bundler -c /path/to/main/cql/file.cql --deps-directory /path/to/deps/directory -v /path/to/valueset/directory --canonical-base "http://example.com/other/canonical/base"
 ```
 
+### Debugging
+
+Debug mode will write all of the ELM content to a file in the `./debug` directory, which it will create. This is useful for inspecting the contents of translated CQL before it gets
+base64 encoded onto a FHIR Library resource.
+
+To enable, use `--debug` as an option in the CLI amongst the other options
+
 ## Full List of Options
 
 ```
@@ -72,8 +89,10 @@ Usage: ecqm-bundler [options]
 
 Options:
   -c, --cql-file <path>
-  --deps <deps...>                       List of CQL dependency files of the main file (default: [])
-  --deps-directory <path>                Directory containing all dependent CQL files
+  -e,--elm-file <path>
+  --debug                                Enable debug mode to write contents to a ./debug directory (default: false)
+  --deps <deps...>                       List of CQL or ELM dependency files of the main file (default: [])
+  --deps-directory <path>                Directory containing all dependent CQL or ELM files
   -n,--numer <expr>                      Numerator expression name of measure (default: "Numerator")
   -i,--ipop <expr>                       Numerator expression name of measure (default: "Initial Population")
   -d,--denom <expr>                      Denominator expression name of measure (default: "Denominator")

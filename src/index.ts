@@ -21,11 +21,15 @@ import logger from './helpers/logger';
 const program = new Command();
 
 program
-  .requiredOption('-c, --cql-file <path>')
+  .option('-c, --cql-file <path>')
+  .option('-e,--elm-file <path>')
+  .option('--debug', 'Enable debug mode to write contents to a ./debug directory', false)
   .addOption(
-    new Option('--deps <deps...>', 'List of CQL dependency files of the main file').default([])
+    new Option('--deps <deps...>', 'List of CQL or ELM dependency files of the main file').default(
+      []
+    )
   )
-  .option('--deps-directory <path>', 'Directory containing all dependent CQL files')
+  .option('--deps-directory <path>', 'Directory containing all dependent CQL or ELM files')
   .option('-n,--numer <expr>', 'Numerator expression name of measure', 'Numerator')
   .option('-i,--ipop <expr>', 'Numerator expression name of measure', 'Initial Population')
   .option('-d,--denom <expr>', 'Denominator expression name of measure', 'Denominator')
@@ -56,8 +60,18 @@ program
 
 const opts = program.opts();
 
+if (opts.elmFile && opts.cqlFile) {
+  logger.error('ERROR: Cannot use both -c/--cql-file and -e/--elm-file\n');
+  program.help();
+}
+
+if (!(opts.elmFile || opts.cqlFile)) {
+  logger.error('ERROR: Must specify one of -c/--cql-file or -e/--elm-file\n');
+  program.help();
+}
+
 if (opts.deps.length !== 0 && opts.depsDirectory) {
-  console.error('ERROR: Must specify only one of -d/--deps and --deps-directory\n');
+  logger.error('ERROR: Must specify only one of -d/--deps and --deps-directory\n');
   program.help();
 }
 
@@ -77,43 +91,72 @@ if (opts.deps.length > 0) {
   const depsBasePath = path.resolve(opts.depsDirectory);
   deps = fs
     .readdirSync(opts.depsDirectory)
-    .filter(f => path.extname(f) === '.cql' && f !== path.basename(opts.cqlFile))
+    .filter(f => {
+      if (opts.elmFile) {
+        return path.extname(f) === '.json' && f !== path.basename(opts.elmFile);
+      } else {
+        return path.extname(f) === '.cql' && f !== path.basename(opts.cqlFile);
+      }
+    })
     .map(f => path.join(depsBasePath, f));
 }
 
 logger.info(`Successfully gathered ${deps.length} dependencies`);
 
-const mainCQLPath = path.resolve(opts.cqlFile);
-const allCQL = [mainCQLPath, ...deps];
-
-logger.info(`Using ${mainCQLPath} as main library`);
-
 async function main(): Promise<fhir4.Bundle> {
-  const mainLibraryId = getMainLibraryId(fs.readFileSync(mainCQLPath, 'utf8'));
   let elm: any[];
-  try {
-    logger.info('Translating all CQL');
-    const [result, errors] = await getELM(allCQL, opts.translatorUrl);
+  let mainLibraryId: string | null = null;
+  if (opts.elmFile) {
+    const mainELM = JSON.parse(fs.readFileSync(path.resolve(opts.elmFile), 'utf8'));
 
-    if (result == null) {
-      logger.error('Error translating CQL:');
-      console.error(errors);
+    mainLibraryId = mainELM.library.identifier.id;
+
+    elm = [mainELM, ...deps.map(d => JSON.parse(fs.readFileSync(path.resolve(d), 'utf8')))];
+  } else {
+    const mainCQLPath = path.resolve(opts.cqlFile);
+    const allCQL = [mainCQLPath, ...deps];
+
+    logger.info(`Using ${mainCQLPath} as main library`);
+
+    mainLibraryId = getMainLibraryId(fs.readFileSync(mainCQLPath, 'utf8'));
+
+    try {
+      logger.info('Translating all CQL');
+      const [result, errors] = await getELM(allCQL, opts.translatorUrl);
+
+      if (result == null) {
+        logger.error('Error translating CQL:');
+        console.error(errors);
+        process.exit(1);
+      }
+      elm = result;
+    } catch (e: any) {
+      logger.error(`HTTP error translating CQL: ${e.message}`);
+      console.error(e.stack);
+
+      if (e.response?.data) {
+        console.log(e.response.data);
+      }
+
       process.exit(1);
     }
-    elm = result;
-  } catch (e: any) {
-    logger.error(`HTTP error translating CQL: ${e.message}`);
-    console.error(e.stack);
+  }
 
-    if (e.response?.data) {
-      console.log(e.response.data);
+  if (opts.debug === true) {
+    if (!fs.existsSync('./debug')) {
+      fs.mkdirSync('./debug');
     }
-
-    process.exit(1);
+    elm.forEach(e => {
+      fs.writeFileSync(
+        `./debug/${e.library.identifier.id}.json`,
+        JSON.stringify(e, null, 2),
+        'utf8'
+      );
+    });
   }
 
   if (!mainLibraryId) {
-    logger.error(`Could not locate main library ID in ${mainCQLPath}`);
+    logger.error(`Could not locate main library ID in ${opts.elmFile || opts.cqlFile}`);
     process.exit(1);
   }
 
