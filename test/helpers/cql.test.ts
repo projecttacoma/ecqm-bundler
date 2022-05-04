@@ -11,7 +11,7 @@ describe('getMainLibraryId', () => {
       library ${libraryId} version '1.0.0'
 
       using FHIR version 4.0.1
-    `;
+    `.trim();
 
     expect(getMainLibraryId(cql)).toEqual(libraryId);
   });
@@ -22,7 +22,7 @@ describe('getMainLibraryId', () => {
       library ${libraryId}
 
       using FHIR version 4.0.1
-    `;
+    `.trim();
 
     expect(getMainLibraryId(cql)).toEqual(libraryId);
   });

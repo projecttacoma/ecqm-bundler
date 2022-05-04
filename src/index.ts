@@ -111,6 +111,11 @@ async function main(): Promise<fhir4.Bundle> {
 
     mainLibraryId = mainELM.library.identifier.id;
 
+    if (!mainLibraryId) {
+      logger.error(`Could not locate main library ID in ${opts.elmFile}`);
+      process.exit(1);
+    }
+
     elm = [mainELM, ...deps.map(d => JSON.parse(fs.readFileSync(path.resolve(d), 'utf8')))];
   } else {
     const mainCQLPath = path.resolve(opts.cqlFile);
@@ -120,9 +125,14 @@ async function main(): Promise<fhir4.Bundle> {
 
     mainLibraryId = getMainLibraryId(fs.readFileSync(mainCQLPath, 'utf8'));
 
+    if (!mainLibraryId) {
+      logger.error(`Could not locate main library ID in ${opts.cqlFile}`);
+      process.exit(1);
+    }
+
     try {
       logger.info('Translating all CQL');
-      const [result, errors] = await getELM(allCQL, opts.translatorUrl);
+      const [result, errors] = await getELM(allCQL, opts.translatorUrl, mainLibraryId);
 
       if (result == null) {
         logger.error('Error translating CQL:');
@@ -153,11 +163,6 @@ async function main(): Promise<fhir4.Bundle> {
         'utf8'
       );
     });
-  }
-
-  if (!mainLibraryId) {
-    logger.error(`Could not locate main library ID in ${opts.elmFile || opts.cqlFile}`);
-    process.exit(1);
   }
 
   const mainLibELM = findELMByIdentifier(

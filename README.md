@@ -30,6 +30,10 @@ ecqm-bundler -c /path/to/main/cql/file.cql --deps /path/to/dep1.cql /path/to/dep
 ecqm-bundler -c /path/to/main/cql/file.cql --deps-directory /path/to/deps/directory -v /path/to/valueset/directory
 ```
 
+**NOTE**: It is okay for the dependency directory to include more CQL files that won't be used. The bundler will parse the CQL content to identify all of the libaries
+that need to be included with the translation request, and will omit any CQL files that aren't included somewhere in the dependency tree starting from the
+main CQL file
+
 ### Bundling from ELM Content
 
 ``` bash

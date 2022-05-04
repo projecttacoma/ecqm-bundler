@@ -1,5 +1,5 @@
 export function getMainLibraryId(cql: string): string | null {
-  const re = /library ([a-zA-Z0-9_]+)( version .*)?/g;
+  const re = /^library ([a-zA-Z0-9_]+)( version .*)?/gm;
 
   const matches = re.exec(cql);
 

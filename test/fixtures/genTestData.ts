@@ -7,7 +7,7 @@ const TRANSLATOR_URL = 'http://localhost:8080/cql/translator';
 const simpleLibraryCQL = path.join(__dirname, './SimpleLibrary.cql');
 const simpleLibraryDependencyCQL = path.join(__dirname, './SimpleLibraryDependency.cql');
 
-getELM([simpleLibraryCQL, simpleLibraryDependencyCQL], TRANSLATOR_URL)
+getELM([simpleLibraryCQL, simpleLibraryDependencyCQL], TRANSLATOR_URL, 'SimpleLibrary')
   .then(([elm, errors]) => {
     if (elm == null || errors != null) {
       throw new Error(`Error translating ELM: ${JSON.stringify(errors)}`);

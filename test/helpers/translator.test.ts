@@ -28,7 +28,8 @@ describe('getELM', () => {
 
     const [elm, errors] = await getELM(
       [SIMPLE_LIBRARY_CQL_PATH, SIMPLE_LIBRARY_DEPENDENCY_CQL_PATH],
-      MOCK_URL
+      MOCK_URL,
+      simpleLibraryELM.library.identifier.id
     );
 
     expect(errors).toBeNull();
@@ -39,7 +40,11 @@ describe('getELM', () => {
     convertCQLSpy.mockReturnValueOnce(new Error('http error') as any); // cql-translator-client types are wrong. The function can return an error
 
     await expect(() =>
-      getELM([SIMPLE_LIBRARY_CQL_PATH, SIMPLE_LIBRARY_DEPENDENCY_CQL_PATH], MOCK_URL)
+      getELM(
+        [SIMPLE_LIBRARY_CQL_PATH, SIMPLE_LIBRARY_DEPENDENCY_CQL_PATH],
+        MOCK_URL,
+        simpleLibraryELM.library.identifier.id
+      )
     ).rejects.toThrow();
   });
 
@@ -58,7 +63,11 @@ describe('getELM', () => {
       })
     );
 
-    const [elm, errors] = await getELM([SIMPLE_LIBRARY_CQL_PATH], MOCK_URL);
+    const [elm, errors] = await getELM(
+      [SIMPLE_LIBRARY_CQL_PATH],
+      MOCK_URL,
+      simpleLibraryELM.library.identifier.id
+    );
 
     expect(elm).toBeNull();
     expect(errors).toEqual([
