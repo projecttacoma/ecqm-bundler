@@ -19,6 +19,12 @@ export enum PopulationCode {
   DENOM = 'denominator'
 }
 
+export function combineURLs(baseURL: string, relativeURL?: string) {
+  return relativeURL
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    : baseURL;
+}
+
 export function generateMeasureResource(
   measureId: string,
   libraryId: string,
@@ -27,12 +33,12 @@ export function generateMeasureResource(
   canonicalBase: string,
   populationCodes: { [key in PopulationCode]: string }
 ): fhir4.Measure {
-  logger.info(`Created Measure/${measureId}`);
+  logger.info(`Creating Measure/${measureId}`);
 
   return {
     resourceType: 'Measure',
     id: measureId,
-    url: new URL(`/Measure/${measureId}`, canonicalBase).toString(),
+    url: combineURLs(canonicalBase, `/Measure/${measureId}`),
     status: 'draft',
     library: [`Library/${libraryId}`],
     improvementNotation: {
@@ -112,8 +118,8 @@ export function generateLibraryResource(
   return {
     resourceType: 'Library',
     id: libraryId,
-    url: new URL(`/Library/${libraryId}`, canonicalBase).toString(),
-    version: elm.library.identifier.version || '0.0.1',
+    url: combineURLs(canonicalBase, `/Library/${libraryId}`),
+    ...(elm.library.identifier.version ? { version: elm.library.identifier.version } : {}),
     type: {
       coding: [
         {
@@ -142,20 +148,21 @@ export function generateRelatedArtifact(display: string, resource: string): fhir
 
 export function generateLibraryRelatedArtifact(
   identifier: ELMIdentification,
-  allELM: any[]
+  allELM: any[],
+  canonicalBase: string
 ): fhir4.RelatedArtifact {
   const matchingELM = findELMByIdentifier(identifier, allELM);
 
   if (!matchingELM) {
-    console.error(`Could not locate main library ELM for ${identifier.id}|${identifier.version}`);
-    process.exit(1);
+    throw new Error(`Could not locate main library ELM for ${identifier.id}|${identifier.version}`);
   }
 
   return generateRelatedArtifact(
     `Library ${identifier.id}`,
-    `http://example.com/Library/${identifier.id}${
-      identifier.version ? `|${identifier.version}` : ''
-    }`
+    combineURLs(
+      canonicalBase,
+      `/Library/library-${identifier.id}${identifier.version ? `|${identifier.version}` : ''}`
+    )
   );
 }
 

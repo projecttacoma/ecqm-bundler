@@ -1,4 +1,11 @@
-import { generateMeasureResource, ImprovementNotation, Scoring } from '../../src/helpers/fhir';
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import {
+  combineURLs,
+  generateLibraryResource,
+  generateMeasureResource,
+  ImprovementNotation,
+  Scoring
+} from '../../src/helpers/fhir';
 
 describe('generateMeasureResource', () => {
   it('should generate proper positive improvement measure resource with inputs', () => {
@@ -110,5 +117,82 @@ describe('generateMeasureResource', () => {
         }
       ]
     });
+  });
+});
+
+describe('combineURLs', () => {
+  it('should join urls with slashes', () => {
+    expect(combineURLs('http://example.com/', '/test')).toEqual('http://example.com/test');
+  });
+
+  it('should join urls a missing slash', () => {
+    expect(combineURLs('http://example.com', 'test')).toEqual('http://example.com/test');
+  });
+
+  it('should join urls a with a slug already present', () => {
+    expect(combineURLs('http://example.com/slug', '/test')).toEqual('http://example.com/slug/test');
+  });
+
+  it('should persist url with no relative slug', () => {
+    expect(combineURLs('http://example.com/slug')).toEqual('http://example.com/slug');
+  });
+});
+
+describe('generateLibraryResource', () => {
+  it('should generate proper basic info', () => {
+    const lib = generateLibraryResource(
+      'library',
+      {
+        library: {
+          identifier: {
+            version: '1.0.0'
+          }
+        }
+      },
+      'http://example.com'
+    );
+
+    expect(lib.url).toEqual('http://example.com/Library/library');
+    expect(lib.version).toEqual('1.0.0');
+    expect(lib.type).toEqual({
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/library-type',
+          code: 'logic-library'
+        }
+      ]
+    });
+    expect(lib.content).toBeDefined();
+  });
+
+  it('should omit version from a library with no version', () => {
+    const lib = generateLibraryResource(
+      'library',
+      {
+        library: {
+          identifier: {}
+        }
+      },
+      'http://example.com'
+    );
+
+    expect(lib.version).toBeUndefined();
+  });
+
+  it('should encode ELM json', () => {
+    const lib = generateLibraryResource(
+      'library',
+      {
+        library: {
+          identifier: {}
+        }
+      },
+      'http://example.com'
+    );
+
+    expect(lib.content).toBeDefined();
+    expect(lib.content).toHaveLength(1);
+    expect(lib.content![0].contentType).toEqual('application/elm+json');
+    expect(typeof lib.content![0].data).toEqual('string');
   });
 });

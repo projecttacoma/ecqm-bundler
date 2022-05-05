@@ -200,7 +200,7 @@ async function main(): Promise<fhir4.Bundle> {
   const mainLibDeps = getDependencyInfo(mainLibELM);
 
   library.relatedArtifact = [
-    ...mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm)),
+    ...mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm, opts.canonicalBase)),
     ...getValueSetInfo(mainLibELM).map(vs => generateValueSetRelatedArtifact(vs))
   ];
 
@@ -209,7 +209,9 @@ async function main(): Promise<fhir4.Bundle> {
   const depLibraries = remainingDeps.map(d => ({
     ...generateLibraryResource(`library-${d.library.identifier.id}`, d, opts.canonicalBase),
     relatedArtifact: [
-      ...getDependencyInfo(d).map(dep => generateLibraryRelatedArtifact(dep, remainingDeps)),
+      ...getDependencyInfo(d).map(dep =>
+        generateLibraryRelatedArtifact(dep, remainingDeps, opts.canonicalBase)
+      ),
       ...getValueSetInfo(d).map(vs => generateValueSetRelatedArtifact(vs))
     ]
   }));
