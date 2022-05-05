@@ -6,6 +6,9 @@
   "bin": {
     "ecqm-bundler": "dist/index.js"
   },
+  "files": [
+    "dist/*"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:test-data": "ts-node test/fixtures/genTestData.ts",
