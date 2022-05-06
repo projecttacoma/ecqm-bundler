@@ -1,4 +1,9 @@
-import { findELMByIdentifier, getDependencyInfo, getValueSetInfo } from '../../src/helpers/elm';
+import {
+  findELMByIdentifier,
+  getAllDependencyInfo,
+  getDependencyInfo,
+  getValueSetInfo
+} from '../../src/helpers/elm';
 import simpleLibraryELM from '../fixtures/SimpleLibrary.json';
 import simpleLibraryDependencyELM from '../fixtures/SimpleLibraryDependency.json';
 
@@ -9,6 +14,17 @@ describe('getDependencyInfo', () => {
 
   it('should resolve dependency in library', () => {
     expect(getDependencyInfo(simpleLibraryELM)).toEqual([
+      {
+        id: simpleLibraryDependencyELM.library.identifier.id,
+        version: simpleLibraryDependencyELM.library.identifier.version
+      }
+    ]);
+  });
+});
+
+describe('getAllDependencyInfo', () => {
+  it('should combine dependencies into one list', () => {
+    expect(getAllDependencyInfo([simpleLibraryELM, simpleLibraryDependencyELM])).toEqual([
       {
         id: simpleLibraryDependencyELM.library.identifier.id,
         version: simpleLibraryDependencyELM.library.identifier.version

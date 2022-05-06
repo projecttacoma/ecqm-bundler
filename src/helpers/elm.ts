@@ -3,6 +3,10 @@ export interface ELMIdentification {
   version?: string;
 }
 
+export function getAllDependencyInfo(elm: any[]): ELMIdentification[] {
+  return [...new Set(elm.map(getDependencyInfo).flat())];
+}
+
 export function getDependencyInfo(elm: any): ELMIdentification[] {
   if (elm.library.includes?.def) {
     const deps: ELMIdentification[] = elm.library.includes.def.map((i: any) => ({

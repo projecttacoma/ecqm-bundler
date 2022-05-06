@@ -14,7 +14,12 @@ import {
   generateValueSetRelatedArtifact,
   PopulationCode
 } from './helpers/fhir';
-import { findELMByIdentifier, getDependencyInfo, getValueSetInfo } from './helpers/elm';
+import {
+  findELMByIdentifier,
+  getAllDependencyInfo,
+  getDependencyInfo,
+  getValueSetInfo
+} from './helpers/elm';
 import { getMainLibraryId } from './helpers/cql';
 import logger from './helpers/logger';
 
@@ -204,7 +209,9 @@ async function main(): Promise<fhir4.Bundle> {
     ...getValueSetInfo(mainLibELM).map(vs => generateValueSetRelatedArtifact(vs))
   ];
 
-  const remainingDeps = elm.filter(e => e.library.identifier.id !== mainLibraryId);
+  const allUsedDependencies = [...new Set(getAllDependencyInfo(elm).map(e => e.id))];
+
+  const remainingDeps = elm.filter(e => allUsedDependencies.includes(e.library.identifier.id));
 
   const depLibraries = remainingDeps.map(d => ({
     ...generateLibraryResource(`library-${d.library.identifier.id}`, d, opts.canonicalBase),
