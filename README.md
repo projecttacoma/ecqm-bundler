@@ -109,3 +109,11 @@ Options:
   -s, --scoring-code <scoring>           Measure's scoring code (choices: "proportion", "ratio", "continuous-variable", "cohort", default: "proportion")
   -h, --help                             display help for command
 ```
+
+# Simple Example
+
+See the `example` directory for example inputs and outputs to `ecqm-bundler`. The `example-measure-bundle.json` file in this directory was generated using the following command:
+
+``` bash
+ecqm-bundler -c example/cql/MainLib.cql --deps-directory example/cql -v example/valuesets
+```
