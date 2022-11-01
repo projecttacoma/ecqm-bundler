@@ -36,22 +36,33 @@ export function resolveDependencies(
   return res;
 }
 
-async function translateCQL(paths: string[], client: Client, mainLibraryId: string): Promise<any> {
+async function translateCQL(
+  paths: string[],
+  client: Client,
+  mainLibraryId: string
+): Promise<{ elm: any; cql: Record<string, string> }> {
   const cqlRequestBody = getCQLInfo(paths);
 
   const usedDependencyIds = [
     ...new Set(resolveDependencies(cqlRequestBody[mainLibraryId].cql, cqlRequestBody))
   ];
 
+  const cqlReturn: Record<string, string> = {};
+
   // Only include cql files that are explicitly included by the dependency chain
   Object.keys(cqlRequestBody).forEach(k => {
     if (k !== mainLibraryId && !usedDependencyIds.includes(k)) {
       delete cqlRequestBody[k];
+    } else {
+      cqlReturn[k] = cqlRequestBody[k].cql;
     }
   });
 
-  const elm = await client.convertCQL(cqlRequestBody);
-  return elm;
+  const elmOrError = await client.convertCQL(cqlRequestBody);
+
+  if (elmOrError instanceof Error) throw elmOrError;
+
+  return { elm: elmOrError, cql: cqlReturn };
 }
 
 function processErrors(elm: any): any[] {
@@ -69,26 +80,29 @@ function processErrors(elm: any): any[] {
   return errors;
 }
 
+export interface TranslationResuls {
+  elm: any[];
+  cqlLookup: Record<string, string>;
+}
+
 export async function getELM(
   cqlPaths: string[],
   translatorUrl: string,
   mainLibraryId: string
-): Promise<[any[] | null, any[] | null]> {
+): Promise<[TranslationResuls | null, any[] | null]> {
   const client = new Client(`${translatorUrl}?annotations=true&locators=true`);
-  const librariesOrError = await translateCQL(cqlPaths, client, mainLibraryId);
-
-  if (librariesOrError instanceof Error) throw librariesOrError;
+  const { elm: libraries, cql } = await translateCQL(cqlPaths, client, mainLibraryId);
 
   const allELM: any[] = [];
-  for (const key in librariesOrError) {
-    const elm = librariesOrError[key];
-    const errors = processErrors(elm as any);
+  for (const key in libraries) {
+    const elm = libraries[key];
+    const errors = processErrors(elm);
     if (errors.length === 0) {
-      allELM.push(elm as any);
+      allELM.push(elm);
     } else {
       return [null, errors];
     }
   }
 
-  return [allELM, null];
+  return [{ elm: allELM, cqlLookup: cql }, null];
 }

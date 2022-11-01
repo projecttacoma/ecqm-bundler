@@ -45,8 +45,10 @@ describe('generateMeasureResource', () => {
     });
     expect(measure.group).toEqual([
       {
+        id: expect.any(String),
         population: [
           {
+            id: expect.any(String),
             code: {
               coding: [
                 {
@@ -61,6 +63,7 @@ describe('generateMeasureResource', () => {
             }
           },
           {
+            id: expect.any(String),
             code: {
               coding: [
                 {
@@ -74,8 +77,8 @@ describe('generateMeasureResource', () => {
               expression: 'Denominator'
             }
           },
-
           {
+            id: expect.any(String),
             code: {
               coding: [
                 {
@@ -149,7 +152,8 @@ describe('generateLibraryResource', () => {
           }
         }
       },
-      'http://example.com'
+      'http://example.com',
+      {}
     );
 
     expect(lib.url).toEqual('http://example.com/Library/library');
@@ -173,7 +177,8 @@ describe('generateLibraryResource', () => {
           identifier: {}
         }
       },
-      'http://example.com'
+      'http://example.com',
+      {}
     );
 
     expect(lib.version).toBeUndefined();
@@ -187,12 +192,18 @@ describe('generateLibraryResource', () => {
           identifier: {}
         }
       },
-      'http://example.com'
+      'http://example.com',
+      {}
     );
 
     expect(lib.content).toBeDefined();
-    expect(lib.content).toHaveLength(1);
-    expect(lib.content![0].contentType).toEqual('application/elm+json');
-    expect(typeof lib.content![0].data).toEqual('string');
+    expect(lib.content).toEqual(
+      expect.arrayContaining([
+        {
+          contentType: 'application/elm+json',
+          data: expect.any(String)
+        }
+      ])
+    );
   });
 });

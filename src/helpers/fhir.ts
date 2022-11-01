@@ -121,7 +121,8 @@ export function generateMeasureResource(
 export function generateLibraryResource(
   libraryId: string,
   elm: any,
-  canonicalBase: string
+  canonicalBase: string,
+  cqlLookup: Record<string, string>
 ): fhir4.Library {
   logger.info(`Creating Library/${libraryId}`);
   return {
@@ -139,6 +140,10 @@ export function generateLibraryResource(
     },
     status: 'draft',
     content: [
+      {
+        contentType: 'text/cql',
+        data: Buffer.from(cqlLookup[elm.library.identifier.id] || '').toString('base64')
+      },
       {
         contentType: 'application/elm+json',
         data: Buffer.from(JSON.stringify(elm)).toString('base64')

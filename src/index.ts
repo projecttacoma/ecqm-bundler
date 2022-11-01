@@ -110,6 +110,7 @@ logger.info(`Successfully gathered ${deps.length} dependencies`);
 
 async function main(): Promise<fhir4.Bundle> {
   let elm: any[];
+  let cqlLookup: Record<string, string> = {};
   let mainLibraryId: string | null = null;
   if (opts.elmFile) {
     const mainELM = JSON.parse(fs.readFileSync(path.resolve(opts.elmFile), 'utf8'));
@@ -144,7 +145,8 @@ async function main(): Promise<fhir4.Bundle> {
         console.error(errors);
         process.exit(1);
       }
-      elm = result;
+      elm = result.elm;
+      cqlLookup = result.cqlLookup;
     } catch (e: any) {
       logger.error(`HTTP error translating CQL: ${e.message}`);
       console.error(e.stack);
@@ -183,7 +185,7 @@ async function main(): Promise<fhir4.Bundle> {
   }
 
   const libraryFHIRId = `library-${mainLibraryId}`;
-  const library = generateLibraryResource(libraryFHIRId, mainLibELM, opts.canonicalBase);
+  const library = generateLibraryResource(libraryFHIRId, mainLibELM, opts.canonicalBase, cqlLookup);
 
   const measureFHIRId = `measure-${mainLibraryId}`;
 
@@ -214,7 +216,12 @@ async function main(): Promise<fhir4.Bundle> {
   const remainingDeps = elm.filter(e => allUsedDependencies.includes(e.library.identifier.id));
 
   const depLibraries = remainingDeps.map(d => ({
-    ...generateLibraryResource(`library-${d.library.identifier.id}`, d, opts.canonicalBase),
+    ...generateLibraryResource(
+      `library-${d.library.identifier.id}`,
+      d,
+      opts.canonicalBase,
+      cqlLookup
+    ),
     relatedArtifact: [
       ...getDependencyInfo(d).map(dep =>
         generateLibraryRelatedArtifact(dep, remainingDeps, opts.canonicalBase)
