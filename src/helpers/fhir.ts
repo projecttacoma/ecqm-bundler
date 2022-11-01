@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { ELMIdentification, findELMByIdentifier } from './elm';
 import logger from './logger';
 
@@ -35,6 +36,10 @@ export function generateMeasureResource(
 ): fhir4.Measure {
   logger.info(`Creating Measure/${measureId}`);
 
+  const ippId = uuidv4();
+  const denomId = uuidv4();
+  const numerId = uuidv4();
+
   return {
     resourceType: 'Measure',
     id: measureId,
@@ -59,8 +64,10 @@ export function generateMeasureResource(
     },
     group: [
       {
+        id: uuidv4(),
         population: [
           {
+            id: ippId,
             code: {
               coding: [
                 {
@@ -75,6 +82,7 @@ export function generateMeasureResource(
             }
           },
           {
+            id: denomId,
             code: {
               coding: [
                 {
@@ -90,6 +98,7 @@ export function generateMeasureResource(
           },
 
           {
+            id: numerId,
             code: {
               coding: [
                 {
