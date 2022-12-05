@@ -3,16 +3,14 @@
 import fs from 'fs';
 import path from 'path';
 import { Command, Option } from 'commander';
+import { v4 as uuidv4 } from 'uuid';
 import { getELM } from './helpers/translator';
 import {
   generateLibraryResource,
   generateMeasureBundle,
   generateMeasureResource,
   generateLibraryRelatedArtifact,
-  ImprovementNotation,
-  Scoring,
-  generateValueSetRelatedArtifact,
-  PopulationCode
+  generateValueSetRelatedArtifact
 } from './helpers/fhir';
 import {
   findELMByIdentifier,
@@ -20,8 +18,16 @@ import {
   getDependencyInfo,
   getValueSetInfo
 } from './helpers/elm';
-import { getMainLibraryId } from './helpers/cql';
+import { extractDefinesFromCQL, getMainLibraryId } from './helpers/cql';
 import logger from './helpers/logger';
+import {
+  GroupInfo,
+  improvementNotation,
+  ImprovementNotation,
+  measurePopulations,
+  ScoringCode,
+  scoringCodes
+} from './types/measure';
 
 const program = new Command();
 
@@ -36,6 +42,7 @@ program
   )
   .option('--deps-directory <path>', 'Directory containing all dependent CQL or ELM files')
   .option('-n,--numer <expr>', 'Numerator expression name of measure', 'Numerator')
+  .option('--interactive', 'Create Bundle in interactive mode (allows for complex values)', false)
   .option('-i,--ipop <expr>', 'Numerator expression name of measure', 'Initial Population')
   .option('-d,--denom <expr>', 'Denominator expression name of measure', 'Denominator')
   .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
@@ -52,15 +59,16 @@ program
     'http://example.com'
   )
   .addOption(
-    new Option('-i, --improvement-notation <notation>', "Measure's improvement notation")
-      .choices(Object.values(ImprovementNotation))
-      .default(ImprovementNotation.POSITIVE)
+    new Option('--improvement-notation <notation>', "Measure's improvement notation")
+      .choices(improvementNotation)
+      .default('increase')
   )
   .addOption(
     new Option('-s, --scoring-code <scoring>', "Measure's scoring code")
-      .choices(Object.values(Scoring))
-      .default(Scoring.PROPORTION)
+      .choices(scoringCodes)
+      .default('proportion')
   )
+  .option('-b, --basis <population-basis>', "Measure's population basis", 'boolean')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -108,7 +116,260 @@ if (opts.deps.length > 0) {
 
 logger.info(`Successfully gathered ${deps.length} dependencies`);
 
-async function main(): Promise<fhir4.Bundle> {
+const EXPR_SKIP_CHOICE = 'SKIP';
+
+async function main() {
+  const { default: inquirer } = await import('inquirer');
+  const allGroupInfo: GroupInfo[] = [];
+  if (opts.interactive) {
+    if (opts.elmFile) {
+      logger.error('ERROR: Interactive mode is only supported with CQL files');
+      program.help();
+    }
+    const mainCQLPath = path.resolve(opts.cqlFile);
+    const mainCQL = fs.readFileSync(mainCQLPath, 'utf8');
+
+    const expressionNames = extractDefinesFromCQL(mainCQL);
+
+    const { numberOfGroups } = await inquirer.prompt<{ numberOfGroups: number }>({
+      name: 'numberOfGroups',
+      type: 'number',
+      message: 'Enter number of Groups in the Measure',
+      default: 1
+    });
+
+    for (let i = 0; i < numberOfGroups; i++) {
+      const selectedGroupExpressions = [...expressionNames];
+      const group = `Group ${i + 1}`;
+
+      const { scoring, measureImprovementNotation, populationBasis, numMeasureObs } =
+        await inquirer.prompt<{
+          scoring: ScoringCode;
+          measureImprovementNotation: ImprovementNotation;
+          populationBasis: string;
+          numMeasureObs: number;
+        }>([
+          {
+            name: 'scoring',
+            type: 'list',
+            message: `Enter ${group} scoring code`,
+            choices: scoringCodes
+          },
+          {
+            name: 'measureImprovementNotation',
+            type: 'list',
+            message: `Enter ${group} improvement notation`,
+            choices: improvementNotation
+          },
+          {
+            name: 'populationBasis',
+            type: 'input',
+            message: `Enter ${group} population basis (see https://build.fhir.org/ig/HL7/cqf-measures/StructureDefinition-cqfm-populationBasis.html for more info)`,
+            default: 'boolean'
+          },
+          {
+            name: 'numMeasureObs',
+            type: 'number',
+            message: `Enter ${group} number of "measure-observation"s`,
+            default: 0
+          }
+        ]);
+
+      const groupInfo: GroupInfo = {
+        scoring,
+        improvementNotation: measureImprovementNotation,
+        populationBasis,
+        populationCriteria: {}
+      };
+
+      let numIPPs = 1;
+      if (scoring === 'ratio') {
+        const { numIPPsChoice } = await inquirer.prompt<{ numIPPsChoice: number }>({
+          name: 'numIPPsChoice',
+          type: 'number',
+          message: `Enter ${group} number of "initial-population"s`,
+          default: 1
+        });
+
+        numIPPs = numIPPsChoice;
+      }
+
+      for (const popCode of measurePopulations) {
+        if (selectedGroupExpressions.length === 0) continue;
+
+        if (popCode === 'initial-population') {
+          for (let j = 0; j < numIPPs; j++) {
+            const { criteriaExpression } = await inquirer.prompt<{
+              criteriaExpression: string;
+            }>({
+              name: 'criteriaExpression',
+              type: 'list',
+              message: `${group} "${popCode}" ${j + 1} expression`,
+              choices: selectedGroupExpressions
+            });
+
+            if (groupInfo.populationCriteria['initial-population']) {
+              groupInfo.populationCriteria['initial-population'].push({
+                id: uuidv4(),
+                criteriaExpression
+              });
+            } else {
+              groupInfo.populationCriteria['initial-population'] = [
+                {
+                  id: uuidv4(),
+                  criteriaExpression
+                }
+              ];
+            }
+
+            selectedGroupExpressions.splice(
+              selectedGroupExpressions.indexOf(criteriaExpression),
+              1
+            );
+          }
+        } else if (popCode === 'measure-observation') {
+          for (let j = 0; j < numMeasureObs; j++) {
+            const { measureObsCriteriaExpression } = await inquirer.prompt<{
+              measureObsCriteriaExpression: string;
+            }>({
+              name: 'measureObsCriteriaExpression',
+              type: 'list',
+              message: `${group} "${popCode}" expression`,
+              choices: [EXPR_SKIP_CHOICE].concat(selectedGroupExpressions)
+            });
+
+            if (measureObsCriteriaExpression !== EXPR_SKIP_CHOICE) {
+              const { observingPopExpression } = await inquirer.prompt<{
+                observingPopExpression: string;
+              }>({
+                name: 'observingPopExpression',
+                type: 'list',
+                message: `${group} "${popCode}" ${measureObsCriteriaExpression} observing population`,
+                choices: expressionNames
+              });
+
+              const observingPops = Object.values(groupInfo.populationCriteria).find(gi => {
+                if (Array.isArray(gi)) {
+                  return gi.some(g => g.criteriaExpression === observingPopExpression);
+                }
+
+                return gi.criteriaExpression === observingPopExpression;
+              });
+
+              if (!observingPops) {
+                logger.error(`ERROR: Could not find population ${observingPopExpression} in group`);
+                process.exit(1);
+              }
+
+              const observingPop = Array.isArray(observingPops)
+                ? observingPops.find(op => op.criteriaExpression === observingPopExpression)
+                : observingPops;
+
+              if (!observingPop) {
+                logger.error(`ERROR: Could not find population ${observingPopExpression} in group`);
+                process.exit(1);
+              }
+
+              if (groupInfo.populationCriteria['measure-observation']) {
+                groupInfo.populationCriteria['measure-observation'].push({
+                  id: uuidv4(),
+                  criteriaExpression: measureObsCriteriaExpression,
+                  observingPopId: observingPop.id
+                });
+              } else {
+                groupInfo.populationCriteria['measure-observation'] = [
+                  {
+                    id: uuidv4(),
+                    criteriaExpression: measureObsCriteriaExpression,
+                    observingPopId: observingPop.id
+                  }
+                ];
+              }
+
+              selectedGroupExpressions.splice(
+                selectedGroupExpressions.indexOf(measureObsCriteriaExpression),
+                1
+              );
+            }
+          }
+        } else {
+          const { criteriaExpression } = await inquirer.prompt<{
+            criteriaExpression: string;
+          }>({
+            name: 'criteriaExpression',
+            type: 'list',
+            message: `${group} "${popCode}" expression`,
+            choices: [EXPR_SKIP_CHOICE].concat(selectedGroupExpressions)
+          });
+
+          if (criteriaExpression !== EXPR_SKIP_CHOICE) {
+            groupInfo.populationCriteria[popCode] = { id: uuidv4(), criteriaExpression };
+            selectedGroupExpressions.splice(
+              selectedGroupExpressions.indexOf(criteriaExpression),
+              1
+            );
+          }
+        }
+
+        if (scoring === 'ratio' && numIPPs > 1) {
+          if (popCode === 'numerator' || popCode === 'denominator') {
+            if (!groupInfo.populationCriteria['initial-population']) {
+              logger.error(
+                `ERROR: could not detect initial-population entries to draw from for ratio measure with multipe IPPs`
+              );
+              process.exit(1);
+            }
+
+            const { observingPopExpression } = await inquirer.prompt<{
+              observingPopExpression: string;
+            }>({
+              name: 'observingPopExpression',
+              type: 'list',
+              message: `${group} initial-population that "${popCode}" draws from`,
+              choices: groupInfo.populationCriteria['initial-population'].map(
+                p => p.criteriaExpression
+              )
+            });
+
+            const observingPopId = groupInfo.populationCriteria['initial-population'].find(
+              p => p.criteriaExpression === observingPopExpression
+            )?.id;
+
+            if (!observingPopId) {
+              logger.error(`ERROR: Could not find population ${observingPopExpression} in group`);
+              process.exit(1);
+            }
+
+            const gi = groupInfo.populationCriteria[popCode];
+            if (!gi) {
+              logger.error(
+                `ERROR: trying to set a criteria reference on ${popCode}, but no criteriaExpression was defined for it`
+              );
+              process.exit(1);
+            }
+
+            gi.observingPopId = observingPopId;
+          }
+        }
+      }
+
+      allGroupInfo.push(groupInfo);
+    }
+  } else {
+    const groupInfo: GroupInfo = {
+      populationBasis: opts.basis,
+      improvementNotation: opts.improvementNotation,
+      scoring: opts.scoringCode,
+      populationCriteria: {
+        'initial-population': opts.ipop,
+        numerator: opts.numer,
+        denominator: opts.denom
+      }
+    };
+
+    allGroupInfo.push(groupInfo);
+  }
+
   let elm: any[];
   let cqlLookup: Record<string, string> = {};
   let mainLibraryId: string | null = null;
@@ -192,14 +453,8 @@ async function main(): Promise<fhir4.Bundle> {
   const measure = generateMeasureResource(
     measureFHIRId,
     libraryFHIRId,
-    opts.improvementNotation,
-    opts.scoringCode,
     opts.canonicalBase,
-    {
-      [PopulationCode.IPOP]: opts.ipop,
-      [PopulationCode.NUMER]: opts.numer,
-      [PopulationCode.DENOM]: opts.denom
-    }
+    allGroupInfo
   );
 
   logger.info('Resolving dependencies/relatedArtifact');

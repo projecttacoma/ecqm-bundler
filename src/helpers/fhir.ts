@@ -1,24 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
+import { GroupInfo } from '../types/measure';
 import { ELMIdentification, findELMByIdentifier } from './elm';
 import logger from './logger';
-
-export enum ImprovementNotation {
-  POSITIVE = 'positive',
-  NEGATIVE = 'negative'
-}
-
-export enum Scoring {
-  PROPORTION = 'proportion',
-  RATIO = 'ratio',
-  CV = 'continuous-variable',
-  COHORT = 'cohort'
-}
-
-export enum PopulationCode {
-  IPOP = 'initial-population',
-  NUMER = 'numerator',
-  DENOM = 'denominator'
-}
 
 export function combineURLs(baseURL: string, relativeURL?: string) {
   return relativeURL
@@ -26,19 +9,80 @@ export function combineURLs(baseURL: string, relativeURL?: string) {
     : baseURL;
 }
 
+function getPopulationArray(groupInfo: GroupInfo) {
+  const populations: fhir4.MeasureGroupPopulation[] = [];
+  Object.entries(groupInfo.populationCriteria).forEach(([popCode, info]) => {
+    if (Array.isArray(info)) {
+      const observations = info.map(inf => {
+        const p: fhir4.MeasureGroupPopulation = {
+          id: inf.id,
+          code: {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/measure-population',
+                code: popCode
+              }
+            ]
+          },
+          criteria: {
+            language: 'text/cql',
+            expression: inf.criteriaExpression
+          }
+        };
+
+        if (inf.observingPopId) {
+          p.extension = [
+            {
+              url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-criteriaReference',
+              valueString: inf.observingPopId
+            }
+          ];
+        }
+
+        return p;
+      });
+
+      populations.push(...observations);
+    } else {
+      const p: fhir4.MeasureGroupPopulation = {
+        id: info.id,
+        code: {
+          coding: [
+            {
+              system: 'http://terminology.hl7.org/CodeSystem/measure-population',
+              code: popCode
+            }
+          ]
+        },
+        criteria: {
+          language: 'text/cql',
+          expression: info.criteriaExpression
+        }
+      };
+
+      if (info.observingPopId) {
+        p.extension = [
+          {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-criteriaReference',
+            valueString: info.observingPopId
+          }
+        ];
+      }
+
+      populations.push(p);
+    }
+  });
+
+  return populations;
+}
+
 export function generateMeasureResource(
   measureId: string,
   libraryId: string,
-  improvementNotation: ImprovementNotation,
-  scoringCode: Scoring,
   canonicalBase: string,
-  populationCodes: { [key in PopulationCode]: string }
+  groupInfo: GroupInfo[]
 ): fhir4.Measure {
   logger.info(`Creating Measure/${measureId}`);
-
-  const ippId = uuidv4();
-  const denomId = uuidv4();
-  const numerId = uuidv4();
 
   return {
     resourceType: 'Measure',
@@ -46,75 +90,38 @@ export function generateMeasureResource(
     url: combineURLs(canonicalBase, `/Measure/${measureId}`),
     status: 'draft',
     library: [`Library/${libraryId}`],
-    improvementNotation: {
-      coding: [
-        {
-          system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
-          code: improvementNotation === ImprovementNotation.POSITIVE ? 'increase' : 'decrease'
-        }
-      ]
-    },
-    scoring: {
-      coding: [
-        {
-          system: 'http://terminology.hl7.org/CodeSystem/measure-scoring',
-          code: scoringCode
-        }
-      ]
-    },
-    group: [
-      {
+    group: groupInfo.map(gi => {
+      const group: fhir4.MeasureGroup = {
         id: uuidv4(),
-        population: [
+        extension: [
           {
-            id: ippId,
-            code: {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-improvementNotation',
+            valueCodeableConcept: {
               coding: [
                 {
-                  system: 'http://terminology.hl7.org/CodeSystem/measure-population',
-                  code: PopulationCode.IPOP
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
+                  code: gi.improvementNotation
                 }
               ]
-            },
-            criteria: {
-              language: 'text/cql',
-              expression: populationCodes[PopulationCode.IPOP]
             }
           },
           {
-            id: denomId,
-            code: {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-scoring',
+            valueCodeableConcept: {
               coding: [
                 {
-                  system: 'http://terminology.hl7.org/CodeSystem/measure-population',
-                  code: PopulationCode.DENOM
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-scoring',
+                  code: gi.scoring
                 }
               ]
-            },
-            criteria: {
-              language: 'text/cql',
-              expression: populationCodes[PopulationCode.DENOM]
-            }
-          },
-
-          {
-            id: numerId,
-            code: {
-              coding: [
-                {
-                  system: 'http://terminology.hl7.org/CodeSystem/measure-population',
-                  code: PopulationCode.NUMER
-                }
-              ]
-            },
-            criteria: {
-              language: 'text/cql',
-              expression: populationCodes[PopulationCode.NUMER]
             }
           }
-        ]
-      }
-    ]
+        ],
+        population: getPopulationArray(gi)
+      };
+
+      return group;
+    })
   };
 }
 

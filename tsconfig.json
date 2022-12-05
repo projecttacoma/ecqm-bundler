@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "target": "es2016",
-    "module": "commonjs",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "resolveJsonModule": true,
     "outDir": "./dist",
     "esModuleInterop": true,

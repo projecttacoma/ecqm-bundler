@@ -1,54 +1,71 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {
   combineURLs,
   generateLibraryResource,
-  generateMeasureResource,
-  ImprovementNotation,
-  Scoring
+  generateMeasureResource
 } from '../../src/helpers/fhir';
 
 describe('generateMeasureResource', () => {
   it('should generate proper positive improvement measure resource with inputs', () => {
-    const measure = generateMeasureResource(
-      'measure',
-      'library',
-      ImprovementNotation.POSITIVE,
-      Scoring.PROPORTION,
-      'http://example.com',
+    const measure = generateMeasureResource('measure', 'library', 'http://example.com', [
       {
-        'initial-population': 'Initial Population',
-        numerator: 'Numerator',
-        denominator: 'Denominator'
+        scoring: 'proportion',
+        populationBasis: 'boolean',
+        improvementNotation: 'increase',
+        populationCriteria: {
+          'initial-population': [
+            {
+              id: 'test-ipp-id',
+              criteriaExpression: 'ipp'
+            }
+          ],
+          denominator: {
+            id: 'test-denom-id',
+            criteriaExpression: 'denom'
+          },
+          numerator: {
+            id: 'test-numer-id',
+            criteriaExpression: 'numer'
+          }
+        }
       }
-    );
+    ]);
 
     expect(measure).toBeDefined();
     expect(measure.resourceType).toEqual('Measure');
     expect(measure.id).toEqual('measure');
     expect(measure.url).toEqual('http://example.com/Measure/measure');
     expect(measure.library).toEqual(['Library/library']);
-    expect(measure.improvementNotation).toEqual({
-      coding: [
-        {
-          system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
-          code: 'increase'
-        }
-      ]
-    });
-    expect(measure.scoring).toEqual({
-      coding: [
-        {
-          system: 'http://terminology.hl7.org/CodeSystem/measure-scoring',
-          code: 'proportion'
-        }
-      ]
-    });
     expect(measure.group).toEqual([
       {
         id: expect.any(String),
+        extension: [
+          {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-improvementNotation',
+            valueCodeableConcept: {
+              coding: [
+                {
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
+                  code: 'increase'
+                }
+              ]
+            }
+          },
+          {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-scoring',
+            valueCodeableConcept: {
+              coding: [
+                {
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-scoring',
+                  code: 'proportion'
+                }
+              ]
+            }
+          }
+        ],
+
         population: [
           {
-            id: expect.any(String),
+            id: 'test-ipp-id',
             code: {
               coding: [
                 {
@@ -59,11 +76,11 @@ describe('generateMeasureResource', () => {
             },
             criteria: {
               language: 'text/cql',
-              expression: 'Initial Population'
+              expression: 'ipp'
             }
           },
           {
-            id: expect.any(String),
+            id: 'test-denom-id',
             code: {
               coding: [
                 {
@@ -74,11 +91,11 @@ describe('generateMeasureResource', () => {
             },
             criteria: {
               language: 'text/cql',
-              expression: 'Denominator'
+              expression: 'denom'
             }
           },
           {
-            id: expect.any(String),
+            id: 'test-numer-id',
             code: {
               coding: [
                 {
@@ -89,37 +106,12 @@ describe('generateMeasureResource', () => {
             },
             criteria: {
               language: 'text/cql',
-              expression: 'Numerator'
+              expression: 'numer'
             }
           }
         ]
       }
     ]);
-  });
-
-  it('should generate proper negative improvement measure resource with inputs', () => {
-    const measure = generateMeasureResource(
-      'measure',
-      'library',
-      ImprovementNotation.NEGATIVE,
-      Scoring.PROPORTION,
-      'http://example.com',
-      {
-        'initial-population': 'Initial Population',
-        numerator: 'Numerator',
-        denominator: 'Denominator'
-      }
-    );
-
-    expect(measure).toBeDefined();
-    expect(measure.improvementNotation).toEqual({
-      coding: [
-        {
-          system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
-          code: 'decrease'
-        }
-      ]
-    });
   });
 });
 
