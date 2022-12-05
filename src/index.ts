@@ -24,7 +24,9 @@ import {
   GroupInfo,
   improvementNotation,
   ImprovementNotation,
+  MeasurePopulation,
   measurePopulations,
+  PopulationInfo,
   ScoringCode,
   scoringCodes
 } from './types/measure';
@@ -32,6 +34,11 @@ import {
 const program = new Command();
 
 program
+  .option(
+    '-i, --interactive',
+    'Create Bundle in interactive mode (allows for complex values)',
+    false
+  )
   .option('-c, --cql-file <path>')
   .option('-e,--elm-file <path>')
   .option('--debug', 'Enable debug mode to write contents to a ./debug directory', false)
@@ -41,10 +48,15 @@ program
     )
   )
   .option('--deps-directory <path>', 'Directory containing all dependent CQL or ELM files')
-  .option('-n,--numer <expr>', 'Numerator expression name of measure', 'Numerator')
-  .option('--interactive', 'Create Bundle in interactive mode (allows for complex values)', false)
-  .option('-i,--ipop <expr>', 'Numerator expression name of measure', 'Initial Population')
-  .option('-d,--denom <expr>', 'Denominator expression name of measure', 'Denominator')
+  .option('--ipop <expr>', 'Initial Population expression name of measure')
+  .option('--numer <expr>', '"numerator" expression name of measure')
+  .option('--numex <expr>', '"numerator-exclusion" expression name of measure')
+  .option('--denom <expr>', '"denominator" expression name of measure')
+  .option('--denex <expr>', '"denominator-exclusion" expression name of measure')
+  .option('--denexcep <expr>', '"denominator-exception" expression name of measure')
+  .option('--msrpopl <expr>', '"measure-population"  expression name of measure')
+  .option('--msrpoplex <expr>', '"measure-population-exclusion"   expression name of measure')
+  .option('--msrobs <expr>', '"measure-observation" expression name of measure')
   .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
   .option('-v, --valuesets <path>', 'Path to directory containing necessary valueset resource')
   .option('--no-valuesets', 'Disable valueset detection and bundling')
@@ -117,6 +129,21 @@ if (opts.deps.length > 0) {
 logger.info(`Successfully gathered ${deps.length} dependencies`);
 
 const EXPR_SKIP_CHOICE = 'SKIP';
+
+function makeSimplePopulationCriteria(
+  popCode: MeasurePopulation,
+  criteriaExpression: string,
+  asArray = false
+) {
+  const criteria: PopulationInfo = {
+    id: uuidv4(),
+    criteriaExpression
+  };
+
+  return {
+    [popCode]: asArray ? [criteria] : criteria
+  };
+}
 
 async function main() {
   const { default: inquirer } = await import('inquirer');
@@ -361,9 +388,16 @@ async function main() {
       improvementNotation: opts.improvementNotation,
       scoring: opts.scoringCode,
       populationCriteria: {
-        'initial-population': opts.ipop,
-        numerator: opts.numer,
-        denominator: opts.denom
+        ...(opts.ipop && makeSimplePopulationCriteria('initial-population', opts.ipop, true)),
+        ...(opts.numer && makeSimplePopulationCriteria('numerator', opts.numer)),
+        ...(opts.numex && makeSimplePopulationCriteria('numerator-exclusion', opts.numex)),
+        ...(opts.denom && makeSimplePopulationCriteria('denominator', opts.denom)),
+        ...(opts.denex && makeSimplePopulationCriteria('denominator-exclusion', opts.denex)),
+        ...(opts.denexcep && makeSimplePopulationCriteria('denominator-exception', opts.denexcep)),
+        ...(opts.msrpopl && makeSimplePopulationCriteria('measure-population', opts.msrpopl)),
+        ...(opts.msrpoplex &&
+          makeSimplePopulationCriteria('measure-population-exclusion', opts.msrpoplex)),
+        ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs, true))
       }
     };
 
