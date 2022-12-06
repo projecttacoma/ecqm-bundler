@@ -40,6 +40,10 @@ describe('generateMeasureResource', () => {
         id: expect.any(String),
         extension: [
           {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis',
+            valueCode: 'boolean'
+          },
+          {
             url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-improvementNotation',
             valueCodeableConcept: {
               coding: [

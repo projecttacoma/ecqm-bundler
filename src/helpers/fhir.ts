@@ -95,6 +95,10 @@ export function generateMeasureResource(
         id: uuidv4(),
         extension: [
           {
+            url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis',
+            valueCode: gi.populationBasis
+          },
+          {
             url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-improvementNotation',
             valueCodeableConcept: {
               coding: [
