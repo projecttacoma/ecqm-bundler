@@ -89,7 +89,7 @@ export function generateMeasureResource(
     id: measureId,
     url: combineURLs(canonicalBase, `/Measure/${measureId}`),
     status: 'draft',
-    library: [`Library/${libraryId}`],
+    library: [combineURLs(canonicalBase, `/Library/${libraryId}`)],
     group: groupInfo.map(gi => {
       const group: fhir4.MeasureGroup = {
         id: uuidv4(),
