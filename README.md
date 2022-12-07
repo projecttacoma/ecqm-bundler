@@ -153,5 +153,5 @@ Options:
 See the `example` directory for example inputs and outputs to `ecqm-bundler`. The `example-measure-bundle.json` file in this directory was generated using the following command:
 
 ```bash
-ecqm-bundler -c example/cql/MainLib.cql --deps-directory example/cql -v example/valuesets
+ecqm-bundler -c example/cql/MainLib.cql --deps-directory example/cql -v example/valuesets --ipop "Initial Population" --denom "Denominator" --numer "Numerator"
 ```
