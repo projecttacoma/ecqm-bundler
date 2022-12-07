@@ -34,7 +34,7 @@ describe('generateMeasureResource', () => {
     expect(measure.resourceType).toEqual('Measure');
     expect(measure.id).toEqual('measure');
     expect(measure.url).toEqual('http://example.com/Measure/measure');
-    expect(measure.library).toEqual(['Library/library']);
+    expect(measure.library).toEqual(['http://example.com/Library/library']);
     expect(measure.group).toEqual([
       {
         id: expect.any(String),
