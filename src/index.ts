@@ -387,22 +387,31 @@ async function main() {
       allGroupInfo.push(groupInfo);
     }
   } else {
+    const popCriteria: GroupInfo['populationCriteria'] = {
+      ...(opts.ipop && makeSimplePopulationCriteria('initial-population', opts.ipop, true)),
+      ...(opts.numer && makeSimplePopulationCriteria('numerator', opts.numer)),
+      ...(opts.numex && makeSimplePopulationCriteria('numerator-exclusion', opts.numex)),
+      ...(opts.denom && makeSimplePopulationCriteria('denominator', opts.denom)),
+      ...(opts.denex && makeSimplePopulationCriteria('denominator-exclusion', opts.denex)),
+      ...(opts.denexcep && makeSimplePopulationCriteria('denominator-exception', opts.denexcep)),
+      ...(opts.msrpopl && makeSimplePopulationCriteria('measure-population', opts.msrpopl)),
+      ...(opts.msrpoplex &&
+        makeSimplePopulationCriteria('measure-population-exclusion', opts.msrpoplex)),
+      ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs, true))
+    };
+
+    if (Object.keys(popCriteria).length === 0) {
+      logger.error(
+        `ERROR: must specify at least 1 population expression (e.g. --ipop "Initial Population")`
+      );
+      program.help();
+    }
+
     const groupInfo: GroupInfo = {
       populationBasis: opts.basis,
       improvementNotation: opts.improvementNotation,
       scoring: opts.scoringCode,
-      populationCriteria: {
-        ...(opts.ipop && makeSimplePopulationCriteria('initial-population', opts.ipop, true)),
-        ...(opts.numer && makeSimplePopulationCriteria('numerator', opts.numer)),
-        ...(opts.numex && makeSimplePopulationCriteria('numerator-exclusion', opts.numex)),
-        ...(opts.denom && makeSimplePopulationCriteria('denominator', opts.denom)),
-        ...(opts.denex && makeSimplePopulationCriteria('denominator-exclusion', opts.denex)),
-        ...(opts.denexcep && makeSimplePopulationCriteria('denominator-exception', opts.denexcep)),
-        ...(opts.msrpopl && makeSimplePopulationCriteria('measure-population', opts.msrpopl)),
-        ...(opts.msrpoplex &&
-          makeSimplePopulationCriteria('measure-population-exclusion', opts.msrpoplex)),
-        ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs, true))
-      }
+      populationCriteria: popCriteria
     };
 
     allGroupInfo.push(groupInfo);
