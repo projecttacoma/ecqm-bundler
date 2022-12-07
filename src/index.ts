@@ -560,6 +560,17 @@ async function main() {
           }
         }
       });
+
+      if (vsResources.length !== allValueSets.length) {
+        const resolvedValueSetUrls = vsResources.map(vs => vs.url);
+
+        const missingUrls = allValueSets.filter(u => !resolvedValueSetUrls.includes(u));
+
+        logger.error(
+          `ERROR: Detected ValueSet(s) ${missingUrls} used by the library but could not be resolved in ${opts.valuesets}`
+        );
+        process.exit(1);
+      }
     }
   }
 
