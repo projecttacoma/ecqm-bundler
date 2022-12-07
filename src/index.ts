@@ -30,6 +30,7 @@ import {
   ScoringCode,
   scoringCodes
 } from './types/measure';
+import { CLIOptions } from './types/cli';
 
 const program = new Command();
 
@@ -55,7 +56,7 @@ program
   .option('--denex <expr>', '"denominator-exclusion" expression name of measure')
   .option('--denexcep <expr>', '"denominator-exception" expression name of measure')
   .option('--msrpopl <expr>', '"measure-population"  expression name of measure')
-  .option('--msrpoplex <expr>', '"measure-population-exclusion"   expression name of measure')
+  .option('--msrpoplex <expr>', '"measure-population-exclusion" expression name of measure')
   .option('--msrobs <expr>', '"measure-observation" expression name of measure')
   .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
   .option('-v, --valuesets <path>', 'Path to directory containing necessary valueset resource')
@@ -83,7 +84,7 @@ program
   .option('-b, --basis <population-basis>', "Measure's population basis", 'boolean')
   .parse(process.argv);
 
-const opts = program.opts();
+const opts = program.opts() as CLIOptions;
 
 if (opts.elmFile && opts.cqlFile) {
   logger.error('ERROR: Cannot use both -c/--cql-file and -e/--elm-file\n');
@@ -119,8 +120,10 @@ if (opts.deps.length > 0) {
     .filter(f => {
       if (opts.elmFile) {
         return path.extname(f) === '.json' && f !== path.basename(opts.elmFile);
-      } else {
+      } else if (opts.cqlFile) {
         return path.extname(f) === '.cql' && f !== path.basename(opts.cqlFile);
+      } else {
+        return false;
       }
     })
     .map(f => path.join(depsBasePath, f));
@@ -153,7 +156,8 @@ async function main() {
       logger.error('ERROR: Interactive mode is only supported with CQL files');
       program.help();
     }
-    const mainCQLPath = path.resolve(opts.cqlFile);
+
+    const mainCQLPath = path.resolve(opts.cqlFile as string);
     const mainCQL = fs.readFileSync(mainCQLPath, 'utf8');
 
     const expressionNames = extractDefinesFromCQL(mainCQL);
@@ -419,7 +423,7 @@ async function main() {
 
     elm = [mainELM, ...deps.map(d => JSON.parse(fs.readFileSync(path.resolve(d), 'utf8')))];
   } else {
-    const mainCQLPath = path.resolve(opts.cqlFile);
+    const mainCQLPath = path.resolve(opts.cqlFile as string);
     const allCQL = [mainCQLPath, ...deps];
 
     logger.info(`Using ${mainCQLPath} as main library`);
@@ -534,7 +538,7 @@ async function main() {
         program.help();
       }
 
-      const vsBasePath = path.resolve(opts.valuesets);
+      const vsBasePath = path.resolve(opts.valuesets as string);
 
       fs.readdirSync(vsBasePath).forEach(f => {
         if (path.extname(f) === '.json') {
