@@ -37,6 +37,77 @@ import { getPopulationConstraintErrors } from './helpers/ecqm';
 
 const program = new Command();
 
+program.command('generate', { isDefault: true });
+program
+  .command('combine-groups')
+  .description('Combine the groups in the measure resources of two different bundles into one')
+  .option('--output <path>', 'Path to output file', './combined.json')
+  .argument('<path-one>')
+  .argument('<path-two>')
+  .action((p1, p2, opts: { output: string }) => {
+    logger.info(`Combining measure groups of ${p1} and ${p2}`);
+
+    const mb1 = JSON.parse(fs.readFileSync(p1, 'utf8')) as fhir4.Bundle;
+    const mb2 = JSON.parse(fs.readFileSync(p2, 'utf8')) as fhir4.Bundle;
+
+    if (!mb1.entry) {
+      logger.error(`No .entry found on bundle ${p1}`);
+      process.exit(1);
+    }
+
+    if (!mb2.entry) {
+      logger.error(`No .entry found on bundle ${p2}`);
+      process.exit(1);
+    }
+
+    if (mb1.entry.length != mb2.entry.length) {
+      logger.error('Measure bundles must have the same number of resources');
+      process.exit(1);
+    }
+
+    logger.info(`Validated Measure bundles`);
+
+    const resourceFrom1 = mb1.entry.find(e => e.resource?.resourceType === 'Measure')?.resource;
+    const resourceFrom2 = mb2.entry.find(e => e.resource?.resourceType === 'Measure')?.resource;
+
+    if (!resourceFrom1) {
+      logger.error(`No Measure resource found in ${p1}`);
+      process.exit(1);
+    }
+
+    if (!resourceFrom2) {
+      logger.error(`No Measure resource found in ${p2}`);
+      process.exit(1);
+    }
+
+    const measure1 = resourceFrom1 as fhir4.Measure;
+    const measure2 = resourceFrom2 as fhir4.Measure;
+
+    const newGroup: fhir4.MeasureGroup[] = (measure1.group ?? []).concat(measure2.group ?? []);
+
+    const newMeasure: fhir4.Measure = {
+      ...measure1,
+      group: newGroup
+    };
+
+    const newBundleEntry = mb1.entry.map(e => {
+      if (e.resource?.resourceType === 'Measure') {
+        return { resource: newMeasure, request: e.request };
+      }
+
+      return e;
+    });
+
+    const newBundle: fhir4.Bundle = {
+      ...mb1,
+      entry: newBundleEntry
+    };
+
+    fs.writeFileSync(opts.output, JSON.stringify(newBundle, null, 2));
+    logger.info(`Wrote file to ${opts.output}`);
+    process.exit(0);
+  });
+
 program
   .option(
     '-i, --interactive',
