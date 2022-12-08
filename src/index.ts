@@ -31,6 +31,7 @@ import {
   scoringCodes
 } from './types/measure';
 import { CLIOptions } from './types/cli';
+import { getPopulationConstraintErrors } from './helpers/ecqm';
 
 const program = new Command();
 
@@ -87,17 +88,17 @@ program
 const opts = program.opts() as CLIOptions;
 
 if (opts.elmFile && opts.cqlFile) {
-  logger.error('ERROR: Cannot use both -c/--cql-file and -e/--elm-file\n');
+  logger.error('Cannot use both -c/--cql-file and -e/--elm-file\n');
   program.help();
 }
 
 if (!(opts.elmFile || opts.cqlFile)) {
-  logger.error('ERROR: Must specify one of -c/--cql-file or -e/--elm-file\n');
+  logger.error('Must specify one of -c/--cql-file or -e/--elm-file\n');
   program.help();
 }
 
 if (opts.deps.length !== 0 && opts.depsDirectory) {
-  logger.error('ERROR: Must specify only one of -d/--deps and --deps-directory\n');
+  logger.error('Must specify only one of -d/--deps and --deps-directory\n');
   program.help();
 }
 
@@ -153,7 +154,7 @@ async function main() {
   const allGroupInfo: GroupInfo[] = [];
   if (opts.interactive) {
     if (opts.elmFile) {
-      logger.error('ERROR: Interactive mode is only supported with CQL files');
+      logger.error('Interactive mode is only supported with CQL files');
       program.help();
     }
 
@@ -288,7 +289,7 @@ async function main() {
               });
 
               if (!observingPops) {
-                logger.error(`ERROR: Could not find population ${observingPopExpression} in group`);
+                logger.error(`Could not find population ${observingPopExpression} in group`);
                 process.exit(1);
               }
 
@@ -297,7 +298,7 @@ async function main() {
                 : observingPops;
 
               if (!observingPop) {
-                logger.error(`ERROR: Could not find population ${observingPopExpression} in group`);
+                logger.error(`Could not find population ${observingPopExpression} in group`);
                 process.exit(1);
               }
 
@@ -346,7 +347,7 @@ async function main() {
           if (popCode === 'numerator' || popCode === 'denominator') {
             if (!groupInfo.populationCriteria['initial-population']) {
               logger.error(
-                `ERROR: could not detect initial-population entries to draw from for ratio measure with multipe IPPs`
+                `Could not detect initial-population entries to draw from for ratio measure with multipe IPPs`
               );
               process.exit(1);
             }
@@ -367,14 +368,14 @@ async function main() {
             )?.id;
 
             if (!observingPopId) {
-              logger.error(`ERROR: Could not find population ${observingPopExpression} in group`);
+              logger.error(`Could not find population ${observingPopExpression} in group`);
               process.exit(1);
             }
 
             const gi = groupInfo.populationCriteria[popCode];
             if (!gi) {
               logger.error(
-                `ERROR: trying to set a criteria reference on ${popCode}, but no criteriaExpression was defined for it`
+                `Trying to set a criteria reference on ${popCode}, but no criteriaExpression was defined for it`
               );
               process.exit(1);
             }
@@ -402,7 +403,7 @@ async function main() {
 
     if (Object.keys(popCriteria).length === 0) {
       logger.error(
-        `ERROR: must specify at least 1 population expression (e.g. --ipop "Initial Population")`
+        `Must specify at least 1 population expression (e.g. --ipop "Initial Population")`
       );
       program.help();
     }
@@ -415,6 +416,13 @@ async function main() {
     };
 
     allGroupInfo.push(groupInfo);
+  }
+
+  const populationConstraintErrors = getPopulationConstraintErrors(allGroupInfo);
+
+  if (populationConstraintErrors.length > 0) {
+    populationConstraintErrors.forEach(errMsg => logger.error(`${errMsg}`));
+    program.help();
   }
 
   let elm: any[];
@@ -567,7 +575,7 @@ async function main() {
         const missingUrls = allValueSets.filter(u => !resolvedValueSetUrls.includes(u));
 
         logger.error(
-          `ERROR: Detected ValueSet(s) ${missingUrls} used by the library but could not be resolved in ${opts.valuesets}`
+          `Detected ValueSet(s) ${missingUrls} used by the library but could not be resolved in ${opts.valuesets}`
         );
         process.exit(1);
       }
