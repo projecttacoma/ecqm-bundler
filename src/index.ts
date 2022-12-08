@@ -22,13 +22,15 @@ import { extractDefinesFromCQL, getMainLibraryId } from './helpers/cql';
 import logger from './helpers/logger';
 import {
   GroupInfo,
+  GroupPopulationCriteria,
   improvementNotation,
   ImprovementNotation,
   MeasurePopulation,
   measurePopulations,
   PopulationInfo,
   ScoringCode,
-  scoringCodes
+  scoringCodes,
+  SingleOrMultiPopulationCriteria
 } from './types/measure';
 import { CLIOptions } from './types/cli';
 import { getPopulationConstraintErrors } from './helpers/ecqm';
@@ -50,15 +52,29 @@ program
     )
   )
   .option('--deps-directory <path>', 'Directory containing all dependent CQL or ELM files')
-  .option('--ipop <expr>', 'Initial Population expression name of measure')
+  .option(
+    '--ipop <expr...>',
+    'Initial Population expression name(s) of measure (enter multiple values for a multiple ipp ratio measure)'
+  )
   .option('--numer <expr>', '"numerator" expression name of measure')
+  .option(
+    '--numer-ipop-ref <expr>',
+    'expression name of the "initial-population" that the numerator draws from'
+  )
   .option('--numex <expr>', '"numerator-exclusion" expression name of measure')
   .option('--denom <expr>', '"denominator" expression name of measure')
+  .option(
+    '--denom-ipop-ref <expr>',
+    'expression name of the "initial-population" that the denominator draws from'
+  )
   .option('--denex <expr>', '"denominator-exclusion" expression name of measure')
   .option('--denexcep <expr>', '"denominator-exception" expression name of measure')
   .option('--msrpopl <expr>', '"measure-population"  expression name of measure')
   .option('--msrpoplex <expr>', '"measure-population-exclusion" expression name of measure')
-  .option('--msrobs <expr>', '"measure-observation" expression name of measure')
+  .option(
+    '--msrobs <expr...>',
+    '"measure-observation" expression name of measure (enter multiple values for a measure with multiple observations)'
+  )
   .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
   .option('-v, --valuesets <path>', 'Path to directory containing necessary valueset resource')
   .option('--no-valuesets', 'Disable valueset detection and bundling')
@@ -108,6 +124,11 @@ if (opts.valuesets === false) {
   );
 }
 
+if (opts.ipop && opts.ipop.length > 1 && opts.scoringCode !== 'ratio') {
+  logger.error('Multiple initial-populations are only supported when using --scoring-code "ratio"');
+  program.help();
+}
+
 let deps: string[] = [];
 
 logger.info('Gathering dependencies');
@@ -134,18 +155,30 @@ logger.info(`Successfully gathered ${deps.length} dependencies`);
 
 const EXPR_SKIP_CHOICE = 'SKIP';
 
-function makeSimplePopulationCriteria(
+function makeSimplePopulationCriteria<T extends string | string[]>(
   popCode: MeasurePopulation,
-  criteriaExpression: string,
-  asArray = false
-) {
+  criteriaExpression: T
+): SingleOrMultiPopulationCriteria<T> {
+  if (Array.isArray(criteriaExpression)) {
+    return {
+      [popCode]: criteriaExpression.map(ce => {
+        const criteria: PopulationInfo = {
+          id: uuidv4(),
+          criteriaExpression: ce
+        };
+
+        return criteria;
+      })
+    };
+  }
+
   const criteria: PopulationInfo = {
     id: uuidv4(),
     criteriaExpression
   };
 
   return {
-    [popCode]: asArray ? [criteria] : criteria
+    [popCode]: criteria
   };
 }
 
@@ -388,8 +421,8 @@ async function main() {
       allGroupInfo.push(groupInfo);
     }
   } else {
-    const popCriteria: GroupInfo['populationCriteria'] = {
-      ...(opts.ipop && makeSimplePopulationCriteria('initial-population', opts.ipop, true)),
+    const popCriteria: GroupPopulationCriteria = {
+      ...(opts.ipop && makeSimplePopulationCriteria('initial-population', opts.ipop)),
       ...(opts.numer && makeSimplePopulationCriteria('numerator', opts.numer)),
       ...(opts.numex && makeSimplePopulationCriteria('numerator-exclusion', opts.numex)),
       ...(opts.denom && makeSimplePopulationCriteria('denominator', opts.denom)),
@@ -398,8 +431,38 @@ async function main() {
       ...(opts.msrpopl && makeSimplePopulationCriteria('measure-population', opts.msrpopl)),
       ...(opts.msrpoplex &&
         makeSimplePopulationCriteria('measure-population-exclusion', opts.msrpoplex)),
-      ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs, true))
+      ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs))
     };
+
+    if (popCriteria['initial-population'] && popCriteria.numerator && opts.numerIpopRef) {
+      const matchingIpop = popCriteria['initial-population'].find(
+        ip => ip.criteriaExpression === opts.numerIpopRef
+      );
+
+      if (!matchingIpop) {
+        logger.error(
+          `Could not find initial-population "${opts.numerIpopRef}" referenced by numerator`
+        );
+        process.exit(1);
+      }
+
+      popCriteria.numerator.observingPopId = matchingIpop.id;
+    }
+
+    if (popCriteria['initial-population'] && popCriteria.denominator && opts.denomIpopRef) {
+      const matchingIpop = popCriteria['initial-population'].find(
+        ip => ip.criteriaExpression === opts.denomIpopRef
+      );
+
+      if (!matchingIpop) {
+        logger.error(
+          `Could not find initial-population "${opts.denomIpopRef}" referenced by denominator`
+        );
+        process.exit(1);
+      }
+
+      popCriteria.denominator.observingPopId = matchingIpop.id;
+    }
 
     if (Object.keys(popCriteria).length === 0) {
       logger.error(

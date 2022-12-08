@@ -15,7 +15,7 @@ export interface CLIOptions {
   cqlFile?: string;
   elmFile?: string;
   depsDirectory?: string;
-  ipop?: string;
+  ipop?: string[];
   numer?: string;
   numex?: string;
   denom?: string;
@@ -23,6 +23,11 @@ export interface CLIOptions {
   denexcep?: string;
   msrpopl?: string;
   msrpoplex?: string;
-  msrobs?: string;
+  msrobs?: string[];
   valuesets?: string | boolean;
+
+  /* Population References */
+
+  numerIpopRef?: string;
+  denomIpopRef?: string;
 }

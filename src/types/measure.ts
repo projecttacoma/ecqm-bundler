@@ -26,17 +26,25 @@ export interface PopulationInfo {
   observingPopId?: string;
 }
 
+export type SinglePopulationCriteria = Omit<
+  Record<MeasurePopulation, PopulationInfo>,
+  'measure-observation' | 'initial-population'
+>;
+
+export type MultiPopulationCriteria = {
+  'measure-observation': PopulationInfo[];
+  'initial-population': PopulationInfo[];
+};
+
+export type SingleOrMultiPopulationCriteria<T extends string | string[]> = T extends string[]
+  ? Partial<MultiPopulationCriteria>
+  : Partial<SinglePopulationCriteria>;
+
+export type GroupPopulationCriteria = Partial<SinglePopulationCriteria & MultiPopulationCriteria>;
+
 export interface GroupInfo {
   scoring: ScoringCode;
   improvementNotation: ImprovementNotation;
   populationBasis: string;
-  populationCriteria: Partial<
-    Omit<
-      Record<MeasurePopulation, PopulationInfo>,
-      'measure-observation' | 'initial-population'
-    > & {
-      'measure-observation': PopulationInfo[];
-      'initial-population': PopulationInfo[];
-    }
-  >;
+  populationCriteria: GroupPopulationCriteria;
 }
