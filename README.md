@@ -83,6 +83,8 @@ the relevant eCQM population. These can be customized with the following CLI opt
 ecqm-bundler -c /path/to/main/cql/file.cql --deps-directory /path/to/deps/directory -v /path/to/valueset/directory --numer "numer def" --denom "denom def" --ipop "ipop def"
 ```
 
+**NOTE**: Based on the scoring code provided, the CLI will enforce the constraints listed in [Table 3-1 of the cqf measures IG](https://build.fhir.org/ig/HL7/cqf-measures/measure-conformance.html#criteria-names)
+
 ### Customizing Canonical URLs
 
 By default, the bundler just uses an `example.com` URL as the base canonical URL for the resources (e.g. `http://example.com/Measure/measure-123`). This can be customized using the `--canonical-base` option:
