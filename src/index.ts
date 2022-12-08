@@ -32,7 +32,7 @@ import {
   scoringCodes,
   SingleOrMultiPopulationCriteria
 } from './types/measure';
-import { CLIOptions } from './types/cli';
+import { CLIOptions, DetailedMeasureObservationOption } from './types/cli';
 import { getPopulationConstraintErrors } from './helpers/ecqm';
 
 const program = new Command();
@@ -74,6 +74,27 @@ program
   .option(
     '--msrobs <expr...>',
     '"measure-observation" expression name of measure (enter multiple values for a measure with multiple observations)'
+  )
+  .option(
+    '--detailed-msrobs <expr...>',
+    'Specify measure-observation(s) that reference another population. Must be of the format "<observation-function-name>|<observing-population-expression>"',
+    (val, current: DetailedMeasureObservationOption[]) => {
+      if (!val.includes('|')) {
+        logger.error(
+          '--detailed-msrobs must be of the format <observation-function-name>|<observing-population-expression>'
+        );
+        program.help();
+      }
+
+      const [obsExpression, observingExpression] = val.split('|');
+      return current.concat([
+        {
+          expression: obsExpression,
+          observingPopulationExpression: observingExpression
+        }
+      ]);
+    },
+    []
   )
   .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
   .option('-v, --valuesets <path>', 'Path to directory containing necessary valueset resource')
@@ -431,8 +452,21 @@ async function main() {
       ...(opts.msrpopl && makeSimplePopulationCriteria('measure-population', opts.msrpopl)),
       ...(opts.msrpoplex &&
         makeSimplePopulationCriteria('measure-population-exclusion', opts.msrpoplex)),
-      ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs))
+      ...(opts.msrobs && makeSimplePopulationCriteria('measure-observation', opts.msrobs)),
+      ...(opts.detailedMsrobs &&
+        opts.detailedMsrobs.length > 0 &&
+        makeSimplePopulationCriteria(
+          'measure-observation',
+          opts.detailedMsrobs.map(obs => obs.expression)
+        ))
     };
+
+    if (Object.keys(popCriteria).length === 0) {
+      logger.error(
+        `Must specify at least 1 population expression (e.g. --ipop "Initial Population")`
+      );
+      program.help();
+    }
 
     if (popCriteria['initial-population'] && popCriteria.numerator && opts.numerIpopRef) {
       const matchingIpop = popCriteria['initial-population'].find(
@@ -464,11 +498,47 @@ async function main() {
       popCriteria.denominator.observingPopId = matchingIpop.id;
     }
 
-    if (Object.keys(popCriteria).length === 0) {
-      logger.error(
-        `Must specify at least 1 population expression (e.g. --ipop "Initial Population")`
-      );
-      program.help();
+    if (opts.detailedMsrobs && opts.detailedMsrobs.length > 0) {
+      opts.detailedMsrobs.forEach(obs => {
+        const matchingPopEntry = Object.values(popCriteria).find(populationInfo => {
+          if (Array.isArray(populationInfo)) {
+            return populationInfo.some(
+              pi => pi.criteriaExpression === obs.observingPopulationExpression
+            );
+          } else {
+            return populationInfo.criteriaExpression === obs.observingPopulationExpression;
+          }
+        });
+
+        if (!matchingPopEntry) {
+          logger.error(
+            `Could not find population "${obs.observingPopulationExpression}" referenced by measure-observation "${obs.expression}"`
+          );
+          process.exit(1);
+        }
+
+        const observingPop = Array.isArray(matchingPopEntry)
+          ? matchingPopEntry.find(op => op.criteriaExpression === obs.observingPopulationExpression)
+          : matchingPopEntry;
+
+        if (!observingPop) {
+          logger.error(
+            `Could not find population "${obs.observingPopulationExpression}" in group referenced by "${obs.expression}"`
+          );
+          process.exit(1);
+        }
+
+        const msrObsEntry = popCriteria['measure-observation']?.find(
+          mo => mo.criteriaExpression === obs.expression
+        );
+
+        if (!msrObsEntry) {
+          logger.error(`Could not find measure observation ${obs.expression} in group`);
+          process.exit(1);
+        }
+
+        msrObsEntry.observingPopId = observingPop.id;
+      });
     }
 
     const groupInfo: GroupInfo = {

@@ -1,5 +1,10 @@
 import { ImprovementNotation, ScoringCode } from './measure';
 
+export interface DetailedMeasureObservationOption {
+  expression: string;
+  observingPopulationExpression: string;
+}
+
 export interface CLIOptions {
   /* Values with defaults */
   out: string;
@@ -30,4 +35,5 @@ export interface CLIOptions {
 
   numerIpopRef?: string;
   denomIpopRef?: string;
+  detailedMsrobs?: DetailedMeasureObservationOption[];
 }
