@@ -76,7 +76,7 @@ program
   .option('--deps-directory <path>', 'Directory containing all dependent CQL or ELM files')
   .option(
     '--ipop <expr...>',
-    'Initial Population expression name(s) of measure (enter multiple values for a multiple ipp ratio measure)'
+    '"initial-Population" expression name(s) of measure (enter multiple values for a multiple ipp ratio measure)'
   )
   .option('--numer <expr>', '"numerator" expression name of measure')
   .option(
