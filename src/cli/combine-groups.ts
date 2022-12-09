@@ -1,12 +1,8 @@
-import fs from 'fs';
-
-export function combineGroups(paths: string[]) {
-  const bundles = paths.map(p => JSON.parse(fs.readFileSync(p, 'utf8')) as fhir4.Bundle);
-
+export function combineGroups(bundles: fhir4.Bundle[]) {
   const bundle1Length = bundles[0].entry?.length;
 
   if (!bundle1Length) {
-    throw new Error(`No .entry found on bundle`);
+    throw new Error(`No entry found on bundle`);
   }
 
   if (!bundles.every(b => b.entry?.length === bundle1Length)) {

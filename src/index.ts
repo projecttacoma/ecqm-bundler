@@ -28,7 +28,7 @@ import {
 import { CLIOptions, DetailedMeasureObservationOption } from './types/cli';
 import { getPopulationConstraintErrors } from './helpers/ecqm';
 import { collectInteractiveInput } from './cli/interactive';
-import { makeSimplePopulationCriteria } from './cli/populations';
+import { findReferencedPopulation, makeSimplePopulationCriteria } from './cli/populations';
 import { combineGroups } from './cli/combine-groups';
 
 const program = new Command();
@@ -40,11 +40,12 @@ program
   .description('Combine the groups in the measure resources of two different bundles into one')
   .option('--output <path>', 'Path to output file', './combined.json')
   .argument('<path...>')
-  .action((paths, opts: { output: string }) => {
+  .action((paths: string[], opts: { output: string }) => {
     logger.info(`Combining measure groups of ${paths}`);
 
     try {
-      const newBundle = combineGroups(paths);
+      const bundles = paths.map(p => JSON.parse(fs.readFileSync(p, 'utf8')) as fhir4.Bundle);
+      const newBundle = combineGroups(bundles);
 
       fs.writeFileSync(opts.output, JSON.stringify(newBundle, null, 2));
       logger.info(`Wrote file to ${opts.output}`);
@@ -271,30 +272,14 @@ async function main() {
 
     if (opts.detailedMsrobs && opts.detailedMsrobs.length > 0) {
       opts.detailedMsrobs.forEach(obs => {
-        const matchingPopEntry = Object.values(popCriteria).find(populationInfo => {
-          if (Array.isArray(populationInfo)) {
-            return populationInfo.some(
-              pi => pi.criteriaExpression === obs.observingPopulationExpression
-            );
-          } else {
-            return populationInfo.criteriaExpression === obs.observingPopulationExpression;
-          }
-        });
-
-        if (!matchingPopEntry) {
-          logger.error(
-            `Could not find population "${obs.observingPopulationExpression}" referenced by measure-observation "${obs.expression}"`
-          );
-          process.exit(1);
-        }
-
-        const observingPop = Array.isArray(matchingPopEntry)
-          ? matchingPopEntry.find(op => op.criteriaExpression === obs.observingPopulationExpression)
-          : matchingPopEntry;
+        const observingPop = findReferencedPopulation(
+          obs.observingPopulationExpression,
+          popCriteria
+        );
 
         if (!observingPop) {
           logger.error(
-            `Could not find population "${obs.observingPopulationExpression}" in group referenced by "${obs.expression}"`
+            `Could not find population "${obs.observingPopulationExpression}" referenced by measure-observation "${obs.expression}"`
           );
           process.exit(1);
         }
@@ -304,7 +289,7 @@ async function main() {
         );
 
         if (!msrObsEntry) {
-          logger.error(`Could not find measure observation ${obs.expression} in group`);
+          logger.error(`Could not find measure observation "${obs.expression}" in group`);
           process.exit(1);
         }
 
