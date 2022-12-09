@@ -25,7 +25,7 @@ function getPopulationArray(groupInfo: GroupInfo) {
             ]
           },
           criteria: {
-            language: 'text/cql',
+            language: 'text/cql-identifier',
             expression: inf.criteriaExpression
           }
         };
@@ -55,7 +55,7 @@ function getPopulationArray(groupInfo: GroupInfo) {
           ]
         },
         criteria: {
-          language: 'text/cql',
+          language: 'text/cql-identifier',
           expression: info.criteriaExpression
         }
       };

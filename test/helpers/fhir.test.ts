@@ -79,7 +79,7 @@ describe('generateMeasureResource', () => {
               ]
             },
             criteria: {
-              language: 'text/cql',
+              language: 'text/cql-identifier',
               expression: 'ipp'
             }
           },
@@ -94,7 +94,7 @@ describe('generateMeasureResource', () => {
               ]
             },
             criteria: {
-              language: 'text/cql',
+              language: 'text/cql-identifier',
               expression: 'denom'
             }
           },
@@ -109,7 +109,7 @@ describe('generateMeasureResource', () => {
               ]
             },
             criteria: {
-              language: 'text/cql',
+              language: 'text/cql-identifier',
               expression: 'numer'
             }
           }

@@ -7,7 +7,7 @@ describe('combineGroups', () => {
       population: [
         {
           criteria: {
-            language: 'text/cql',
+            language: 'text/cql-identifier',
             expression: 'group-1-expr'
           }
         }
@@ -19,7 +19,7 @@ describe('combineGroups', () => {
       population: [
         {
           criteria: {
-            language: 'text/cql',
+            language: 'text/cql-identifier',
             expression: 'group-2-expr'
           }
         }

@@ -13,7 +13,7 @@
         ],
         "group": [
           {
-            "id": "a49e6da5-6c68-473b-a01c-67e849a534dd",
+            "id": "16b4a0c7-f0f2-4261-b9e5-7aebc5fd92e2",
             "extension": [
               {
                 "url": "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis",
@@ -44,7 +44,7 @@
             ],
             "population": [
               {
-                "id": "2b85102a-ffe8-4eb2-83cd-424e5da27ffc",
+                "id": "5a6f376e-e6e2-446c-a5e6-960e32a43fa1",
                 "code": {
                   "coding": [
                     {
@@ -54,12 +54,12 @@
                   ]
                 },
                 "criteria": {
-                  "language": "text/cql",
+                  "language": "text/cql-identifier",
                   "expression": "Initial Population"
                 }
               },
               {
-                "id": "671daea9-ada8-4043-84e7-fe030f664378",
+                "id": "23476b58-ac0e-4e42-9213-b4655b1bcbaa",
                 "code": {
                   "coding": [
                     {
@@ -69,12 +69,12 @@
                   ]
                 },
                 "criteria": {
-                  "language": "text/cql",
+                  "language": "text/cql-identifier",
                   "expression": "Numerator"
                 }
               },
               {
-                "id": "eb3f6c89-4576-4409-a939-ed8a0dd35898",
+                "id": "72e5c0da-806c-451a-92fe-4953b03c83bb",
                 "code": {
                   "coding": [
                     {
@@ -84,7 +84,7 @@
                   ]
                 },
                 "criteria": {
-                  "language": "text/cql",
+                  "language": "text/cql-identifier",
                   "expression": "Denominator"
                 }
               }
