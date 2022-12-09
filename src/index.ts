@@ -3,7 +3,6 @@
 import fs from 'fs';
 import path from 'path';
 import { Command, Option } from 'commander';
-import { v4 as uuidv4 } from 'uuid';
 import { getELM } from './helpers/translator';
 import {
   generateLibraryResource,
@@ -18,22 +17,19 @@ import {
   getDependencyInfo,
   getValueSetInfo
 } from './helpers/elm';
-import { extractDefinesFromCQL, getMainLibraryId } from './helpers/cql';
+import { getMainLibraryId } from './helpers/cql';
 import logger from './helpers/logger';
 import {
   GroupInfo,
   GroupPopulationCriteria,
   improvementNotation,
-  ImprovementNotation,
-  MeasurePopulation,
-  measurePopulations,
-  PopulationInfo,
-  ScoringCode,
-  scoringCodes,
-  SingleOrMultiPopulationCriteria
+  scoringCodes
 } from './types/measure';
 import { CLIOptions, DetailedMeasureObservationOption } from './types/cli';
 import { getPopulationConstraintErrors } from './helpers/ecqm';
+import { collectInteractiveInput } from './cli/interactive';
+import { makeSimplePopulationCriteria } from './cli/populations';
+import { combineGroups } from './cli/combine-groups';
 
 const program = new Command();
 
@@ -43,69 +39,22 @@ program
   .command('combine-groups')
   .description('Combine the groups in the measure resources of two different bundles into one')
   .option('--output <path>', 'Path to output file', './combined.json')
-  .argument('<path-one>')
-  .argument('<path-two>')
-  .action((p1, p2, opts: { output: string }) => {
-    logger.info(`Combining measure groups of ${p1} and ${p2}`);
+  .argument('<path...>')
+  .action((paths, opts: { output: string }) => {
+    logger.info(`Combining measure groups of ${paths}`);
 
-    const mb1 = JSON.parse(fs.readFileSync(p1, 'utf8')) as fhir4.Bundle;
-    const mb2 = JSON.parse(fs.readFileSync(p2, 'utf8')) as fhir4.Bundle;
+    try {
+      const newBundle = combineGroups(paths);
 
-    if (!mb1.entry) {
-      logger.error(`No .entry found on bundle ${p1}`);
-      process.exit(1);
-    }
-
-    if (!mb2.entry) {
-      logger.error(`No .entry found on bundle ${p2}`);
-      process.exit(1);
-    }
-
-    if (mb1.entry.length != mb2.entry.length) {
-      logger.error('Measure bundles must have the same number of resources');
-      process.exit(1);
-    }
-
-    logger.info(`Validated Measure bundles`);
-
-    const resourceFrom1 = mb1.entry.find(e => e.resource?.resourceType === 'Measure')?.resource;
-    const resourceFrom2 = mb2.entry.find(e => e.resource?.resourceType === 'Measure')?.resource;
-
-    if (!resourceFrom1) {
-      logger.error(`No Measure resource found in ${p1}`);
-      process.exit(1);
-    }
-
-    if (!resourceFrom2) {
-      logger.error(`No Measure resource found in ${p2}`);
-      process.exit(1);
-    }
-
-    const measure1 = resourceFrom1 as fhir4.Measure;
-    const measure2 = resourceFrom2 as fhir4.Measure;
-
-    const newGroup: fhir4.MeasureGroup[] = (measure1.group ?? []).concat(measure2.group ?? []);
-
-    const newMeasure: fhir4.Measure = {
-      ...measure1,
-      group: newGroup
-    };
-
-    const newBundleEntry = mb1.entry.map(e => {
-      if (e.resource?.resourceType === 'Measure') {
-        return { resource: newMeasure, request: e.request };
+      fs.writeFileSync(opts.output, JSON.stringify(newBundle, null, 2));
+      logger.info(`Wrote file to ${opts.output}`);
+    } catch (e) {
+      if (e instanceof Error) {
+        logger.error(e.message);
+        process.exit(1);
       }
+    }
 
-      return e;
-    });
-
-    const newBundle: fhir4.Bundle = {
-      ...mb1,
-      entry: newBundleEntry
-    };
-
-    fs.writeFileSync(opts.output, JSON.stringify(newBundle, null, 2));
-    logger.info(`Wrote file to ${opts.output}`);
     process.exit(0);
   });
 
@@ -222,6 +171,11 @@ if (opts.ipop && opts.ipop.length > 1 && opts.scoringCode !== 'ratio') {
   program.help();
 }
 
+if (opts.interactive && opts.elmFile) {
+  logger.error('Interactive mode is only supported with CQL files');
+  program.help();
+}
+
 let deps: string[] = [];
 
 logger.info('Gathering dependencies');
@@ -246,272 +200,17 @@ if (opts.deps.length > 0) {
 
 logger.info(`Successfully gathered ${deps.length} dependencies`);
 
-const EXPR_SKIP_CHOICE = 'SKIP';
-
-function makeSimplePopulationCriteria<T extends string | string[]>(
-  popCode: MeasurePopulation,
-  criteriaExpression: T
-): SingleOrMultiPopulationCriteria<T> {
-  if (Array.isArray(criteriaExpression)) {
-    return {
-      [popCode]: criteriaExpression.map(ce => {
-        const criteria: PopulationInfo = {
-          id: uuidv4(),
-          criteriaExpression: ce
-        };
-
-        return criteria;
-      })
-    };
-  }
-
-  const criteria: PopulationInfo = {
-    id: uuidv4(),
-    criteriaExpression
-  };
-
-  return {
-    [popCode]: criteria
-  };
-}
-
 async function main() {
-  const { default: inquirer } = await import('inquirer');
-  const allGroupInfo: GroupInfo[] = [];
+  let allGroupInfo: GroupInfo[] = [];
   if (opts.interactive) {
-    if (opts.elmFile) {
-      logger.error('Interactive mode is only supported with CQL files');
-      program.help();
-    }
-
-    const mainCQLPath = path.resolve(opts.cqlFile as string);
-    const mainCQL = fs.readFileSync(mainCQLPath, 'utf8');
-
-    const expressionNames = extractDefinesFromCQL(mainCQL);
-
-    const { numberOfGroups } = await inquirer.prompt<{ numberOfGroups: number }>({
-      name: 'numberOfGroups',
-      type: 'number',
-      message: 'Enter number of Groups in the Measure',
-      default: 1
-    });
-
-    for (let i = 0; i < numberOfGroups; i++) {
-      const selectedGroupExpressions = [...expressionNames];
-      const group = `Group ${i + 1}`;
-
-      const { scoring, measureImprovementNotation, populationBasis, numMeasureObs } =
-        await inquirer.prompt<{
-          scoring: ScoringCode;
-          measureImprovementNotation: ImprovementNotation;
-          populationBasis: string;
-          numMeasureObs: number;
-        }>([
-          {
-            name: 'scoring',
-            type: 'list',
-            message: `Enter ${group} scoring code`,
-            choices: scoringCodes
-          },
-          {
-            name: 'measureImprovementNotation',
-            type: 'list',
-            message: `Enter ${group} improvement notation`,
-            choices: improvementNotation
-          },
-          {
-            name: 'populationBasis',
-            type: 'input',
-            message: `Enter ${group} population basis (see https://build.fhir.org/ig/HL7/cqf-measures/StructureDefinition-cqfm-populationBasis.html for more info)`,
-            default: 'boolean'
-          },
-          {
-            name: 'numMeasureObs',
-            type: 'number',
-            message: `Enter ${group} number of "measure-observation"s`,
-            default: 0
-          }
-        ]);
-
-      const groupInfo: GroupInfo = {
-        scoring,
-        improvementNotation: measureImprovementNotation,
-        populationBasis,
-        populationCriteria: {}
-      };
-
-      let numIPPs = 1;
-      if (scoring === 'ratio') {
-        const { numIPPsChoice } = await inquirer.prompt<{ numIPPsChoice: number }>({
-          name: 'numIPPsChoice',
-          type: 'number',
-          message: `Enter ${group} number of "initial-population"s`,
-          default: 1
-        });
-
-        numIPPs = numIPPsChoice;
+    try {
+      const mainCQLPath = path.resolve(opts.cqlFile as string);
+      allGroupInfo = await collectInteractiveInput(mainCQLPath);
+    } catch (e) {
+      if (e instanceof Error) {
+        logger.error(e.message);
+        process.exit(1);
       }
-
-      for (const popCode of measurePopulations) {
-        if (selectedGroupExpressions.length === 0) continue;
-
-        if (popCode === 'initial-population') {
-          for (let j = 0; j < numIPPs; j++) {
-            const { criteriaExpression } = await inquirer.prompt<{
-              criteriaExpression: string;
-            }>({
-              name: 'criteriaExpression',
-              type: 'list',
-              message: `${group} "${popCode}" ${j + 1} expression`,
-              choices: selectedGroupExpressions
-            });
-
-            if (groupInfo.populationCriteria['initial-population']) {
-              groupInfo.populationCriteria['initial-population'].push({
-                id: uuidv4(),
-                criteriaExpression
-              });
-            } else {
-              groupInfo.populationCriteria['initial-population'] = [
-                {
-                  id: uuidv4(),
-                  criteriaExpression
-                }
-              ];
-            }
-
-            selectedGroupExpressions.splice(
-              selectedGroupExpressions.indexOf(criteriaExpression),
-              1
-            );
-          }
-        } else if (popCode === 'measure-observation') {
-          for (let j = 0; j < numMeasureObs; j++) {
-            const { measureObsCriteriaExpression } = await inquirer.prompt<{
-              measureObsCriteriaExpression: string;
-            }>({
-              name: 'measureObsCriteriaExpression',
-              type: 'list',
-              message: `${group} "${popCode}" expression`,
-              choices: [EXPR_SKIP_CHOICE].concat(selectedGroupExpressions)
-            });
-
-            if (measureObsCriteriaExpression !== EXPR_SKIP_CHOICE) {
-              const { observingPopExpression } = await inquirer.prompt<{
-                observingPopExpression: string;
-              }>({
-                name: 'observingPopExpression',
-                type: 'list',
-                message: `${group} "${popCode}" ${measureObsCriteriaExpression} observing population`,
-                choices: expressionNames
-              });
-
-              const observingPops = Object.values(groupInfo.populationCriteria).find(gi => {
-                if (Array.isArray(gi)) {
-                  return gi.some(g => g.criteriaExpression === observingPopExpression);
-                }
-
-                return gi.criteriaExpression === observingPopExpression;
-              });
-
-              if (!observingPops) {
-                logger.error(`Could not find population ${observingPopExpression} in group`);
-                process.exit(1);
-              }
-
-              const observingPop = Array.isArray(observingPops)
-                ? observingPops.find(op => op.criteriaExpression === observingPopExpression)
-                : observingPops;
-
-              if (!observingPop) {
-                logger.error(`Could not find population ${observingPopExpression} in group`);
-                process.exit(1);
-              }
-
-              if (groupInfo.populationCriteria['measure-observation']) {
-                groupInfo.populationCriteria['measure-observation'].push({
-                  id: uuidv4(),
-                  criteriaExpression: measureObsCriteriaExpression,
-                  observingPopId: observingPop.id
-                });
-              } else {
-                groupInfo.populationCriteria['measure-observation'] = [
-                  {
-                    id: uuidv4(),
-                    criteriaExpression: measureObsCriteriaExpression,
-                    observingPopId: observingPop.id
-                  }
-                ];
-              }
-
-              selectedGroupExpressions.splice(
-                selectedGroupExpressions.indexOf(measureObsCriteriaExpression),
-                1
-              );
-            }
-          }
-        } else {
-          const { criteriaExpression } = await inquirer.prompt<{
-            criteriaExpression: string;
-          }>({
-            name: 'criteriaExpression',
-            type: 'list',
-            message: `${group} "${popCode}" expression`,
-            choices: [EXPR_SKIP_CHOICE].concat(selectedGroupExpressions)
-          });
-
-          if (criteriaExpression !== EXPR_SKIP_CHOICE) {
-            groupInfo.populationCriteria[popCode] = { id: uuidv4(), criteriaExpression };
-            selectedGroupExpressions.splice(
-              selectedGroupExpressions.indexOf(criteriaExpression),
-              1
-            );
-          }
-        }
-
-        if (scoring === 'ratio' && numIPPs > 1) {
-          if (popCode === 'numerator' || popCode === 'denominator') {
-            if (!groupInfo.populationCriteria['initial-population']) {
-              logger.error(
-                `Could not detect initial-population entries to draw from for ratio measure with multipe IPPs`
-              );
-              process.exit(1);
-            }
-
-            const { observingPopExpression } = await inquirer.prompt<{
-              observingPopExpression: string;
-            }>({
-              name: 'observingPopExpression',
-              type: 'list',
-              message: `${group} initial-population that "${popCode}" draws from`,
-              choices: groupInfo.populationCriteria['initial-population'].map(
-                p => p.criteriaExpression
-              )
-            });
-
-            const observingPopId = groupInfo.populationCriteria['initial-population'].find(
-              p => p.criteriaExpression === observingPopExpression
-            )?.id;
-
-            if (!observingPopId) {
-              logger.error(`Could not find population ${observingPopExpression} in group`);
-              process.exit(1);
-            }
-
-            const gi = groupInfo.populationCriteria[popCode];
-            if (!gi) {
-              logger.error(
-                `Trying to set a criteria reference on ${popCode}, but no criteriaExpression was defined for it`
-              );
-              process.exit(1);
-            }
-
-            gi.observingPopId = observingPopId;
-          }
-        }
-      }
-
-      allGroupInfo.push(groupInfo);
     }
   } else {
     const popCriteria: GroupPopulationCriteria = {
