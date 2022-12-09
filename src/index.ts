@@ -33,7 +33,7 @@ import { combineGroups } from './cli/combine-groups';
 
 const program = new Command();
 
-program.version('v0.2.0-beta.1');
+program.version('v0.2.0');
 program.command('generate', { isDefault: true });
 program
   .command('combine-groups')
