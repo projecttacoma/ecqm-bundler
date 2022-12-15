@@ -284,8 +284,9 @@ async function main() {
           process.exit(1);
         }
 
+        // Skip any measure observation entries that have already been processed
         const msrObsEntry = popCriteria['measure-observation']?.find(
-          mo => mo.criteriaExpression === obs.expression
+          mo => mo.criteriaExpression === obs.expression && !mo.observingPopId
         );
 
         if (!msrObsEntry) {
