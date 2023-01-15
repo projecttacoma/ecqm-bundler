@@ -29,6 +29,8 @@ ecqm-bundler -c /path/to/main/cql/file.cql -v /path/to/valueset/directory --ipop
 **NOTE**: Based on the scoring code provided, the CLI will enforce the constraints listed in [Table 3-1 of the cqf measures IG](https://build.fhir.org/ig/HL7/cqf-measures/measure-conformance.html#criteria-names). This means that you _must_ specify the minimum
 valid population expressions for your Measure's scoring type.
 
+This behavior can be disabled using the `--disable-constraints` CLI option.
+
 ### Customizing Population Expressions
 
 The bundler will add [population group criteria](http://hl7.org/fhir/us/cqfmeasures/2021May/StructureDefinition-measure-cqfm-definitions.html#Measure.group) to the Measure resource, which references specific CQL/ELM expressions that identify
@@ -225,6 +227,7 @@ Options:
   --improvement-notation <notation>   Measure's improvement notation (choices: "increase", "decrease", default: "increase")
   -s, --scoring-code <scoring>        Measure's scoring code (choices: "proportion", "ratio", "continuous-variable", "cohort", default: "proportion")
   -b, --basis <population-basis>      Measure's population basis (default: "boolean")
+  --disable-constraints               Bypass the population constraints defined for the given measure scoring code (useful for debugging)
   -h, --help                          display help for command
 
 Commands:

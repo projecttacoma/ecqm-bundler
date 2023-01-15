@@ -30,6 +30,7 @@ export interface CLIOptions {
   msrpoplex?: string;
   msrobs?: string[];
   valuesets?: string | boolean;
+  disableConstraints?: boolean;
 
   /* Population References */
 

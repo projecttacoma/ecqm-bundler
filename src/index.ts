@@ -142,6 +142,10 @@ program
       .default('proportion')
   )
   .option('-b, --basis <population-basis>', "Measure's population basis", 'boolean')
+  .option(
+    '--disable-constraints',
+    'Bypass the population constraints defined for the given measure scoring code (useful for debugging)'
+  )
   .parse(process.argv);
 
 const opts = program.opts() as CLIOptions;
@@ -233,7 +237,7 @@ async function main() {
         ))
     };
 
-    if (Object.keys(popCriteria).length === 0) {
+    if (!opts.disableConstraints && Object.keys(popCriteria).length === 0) {
       logger.error(
         `Must specify at least 1 population expression (e.g. --ipop "Initial Population")`
       );
@@ -308,11 +312,13 @@ async function main() {
     allGroupInfo.push(groupInfo);
   }
 
-  const populationConstraintErrors = getPopulationConstraintErrors(allGroupInfo);
+  if (!opts.disableConstraints) {
+    const populationConstraintErrors = getPopulationConstraintErrors(allGroupInfo);
 
-  if (populationConstraintErrors.length > 0) {
-    populationConstraintErrors.forEach(errMsg => logger.error(`${errMsg}`));
-    program.help();
+    if (populationConstraintErrors.length > 0) {
+      populationConstraintErrors.forEach(errMsg => logger.error(`${errMsg}`));
+      program.help();
+    }
   }
 
   let elm: any[];
