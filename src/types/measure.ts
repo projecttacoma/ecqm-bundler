@@ -6,7 +6,7 @@ export const scoringCodes = [
   'composite'
 ] as const;
 
-export type ScoringCode = typeof scoringCodes[number];
+export type ScoringCode = (typeof scoringCodes)[number];
 
 export const compositeScoringCodes = [
   'opportunity',
@@ -15,11 +15,11 @@ export const compositeScoringCodes = [
   'weighted'
 ] as const;
 
-export type CompositeScoring = typeof compositeScoringCodes[number];
+export type CompositeScoring = (typeof compositeScoringCodes)[number];
 
 export const improvementNotation = ['increase', 'decrease'] as const;
 
-export type ImprovementNotation = typeof improvementNotation[number];
+export type ImprovementNotation = (typeof improvementNotation)[number];
 
 export const measurePopulations = [
   'initial-population',
@@ -33,7 +33,7 @@ export const measurePopulations = [
   'measure-observation'
 ] as const;
 
-export type MeasurePopulation = typeof measurePopulations[number];
+export type MeasurePopulation = (typeof measurePopulations)[number];
 
 export interface PopulationInfo {
   id: string;
