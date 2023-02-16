@@ -9,7 +9,8 @@ import {
   generateMeasureBundle,
   generateMeasureResource,
   generateLibraryRelatedArtifact,
-  generateValueSetRelatedArtifact
+  generateValueSetRelatedArtifact,
+  generateCompositeMeasureResource
 } from './helpers/fhir';
 import {
   findELMByIdentifier,
@@ -20,12 +21,15 @@ import {
 import { getMainLibraryId } from './helpers/cql';
 import logger from './helpers/logger';
 import {
+  CompositeScoring,
+  compositeScoringCodes,
   GroupInfo,
   GroupPopulationCriteria,
   improvementNotation,
+  MeasureBundle,
   scoringCodes
 } from './types/measure';
-import { CLIOptions, DetailedMeasureObservationOption } from './types/cli';
+import { BaseOpts, CLIOptions, DetailedMeasureObservationOption } from './types/cli';
 import { getPopulationConstraintErrors } from './helpers/ecqm';
 import { collectInteractiveInput } from './cli/interactive';
 import { findReferencedPopulation, makeSimplePopulationCriteria } from './cli/populations';
@@ -34,32 +38,9 @@ import { combineGroups } from './cli/combine-groups';
 const program = new Command();
 
 program.version('v0.2.2');
-program.command('generate', { isDefault: true });
-program
-  .command('combine-groups')
-  .description('Combine the groups in the measure resources of two different bundles into one')
-  .option('--output <path>', 'Path to output file', './combined.json')
-  .argument('<path...>')
-  .action((paths: string[], opts: { output: string }) => {
-    logger.info(`Combining measure groups of ${paths}`);
-
-    try {
-      const bundles = paths.map(p => JSON.parse(fs.readFileSync(p, 'utf8')) as fhir4.Bundle);
-      const newBundle = combineGroups(bundles);
-
-      fs.writeFileSync(opts.output, JSON.stringify(newBundle, null, 2));
-      logger.info(`Wrote file to ${opts.output}`);
-    } catch (e) {
-      if (e instanceof Error) {
-        logger.error(e.message);
-        process.exit(1);
-      }
-    }
-
-    process.exit(0);
-  });
 
 program
+  .command('generate', { isDefault: true })
   .option(
     '-i, --interactive',
     'Create Bundle in interactive mode (allows for complex values)',
@@ -118,23 +99,12 @@ program
     },
     []
   )
-  .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
   .option('-v, --valuesets <path>', 'Path to directory containing necessary valueset resource')
   .option('--no-valuesets', 'Disable valueset detection and bundling')
   .option(
     '-u, --translator-url <url>',
     'URL of cql translation service to use',
     'http://localhost:8080/cql/translator'
-  )
-  .option(
-    '--canonical-base <url>',
-    'Base URL to use for the canonical URLs of library and measure resources',
-    'http://example.com'
-  )
-  .addOption(
-    new Option('--improvement-notation <notation>', "Measure's improvement notation")
-      .choices(improvementNotation)
-      .default('increase')
   )
   .addOption(
     new Option('-s, --scoring-code <scoring>', "Measure's scoring code")
@@ -146,66 +116,180 @@ program
     '--disable-constraints',
     'Bypass the population constraints defined for the given measure scoring code (useful for debugging)'
   )
-  .parse(process.argv);
+  .action((opts: CLIOptions) => {
+    const baseOpts = program.opts() as BaseOpts;
+    main(opts, baseOpts).then(bundle => {
+      fs.writeFileSync(baseOpts.out, JSON.stringify(bundle, null, 2), 'utf8');
+      logger.info(`Wrote file to ${baseOpts.out}`);
+    });
+  });
 
-const opts = program.opts() as CLIOptions;
+program
+  .command('combine-groups')
+  .description('Combine the groups in the measure resources of two different bundles into one')
+  .argument('<path...>')
+  .action((paths: string[]) => {
+    logger.info(`Combining measure groups of ${paths}`);
 
-if (opts.elmFile && opts.cqlFile) {
-  logger.error('Cannot use both -c/--cql-file and -e/--elm-file\n');
-  program.help();
-}
+    try {
+      const baseOpts = program.opts() as BaseOpts;
+      const bundles = paths.map(p => JSON.parse(fs.readFileSync(p, 'utf8')) as MeasureBundle);
+      const newBundle = combineGroups(bundles);
 
-if (!(opts.elmFile || opts.cqlFile)) {
-  logger.error('Must specify one of -c/--cql-file or -e/--elm-file\n');
-  program.help();
-}
-
-if (opts.deps.length !== 0 && opts.depsDirectory) {
-  logger.error('Must specify only one of -d/--deps and --deps-directory\n');
-  program.help();
-}
-
-if (opts.valuesets === false) {
-  logger.warn(
-    'Configured bundler to not resolve ValueSet resources. Resulting Bundle may be incomplete'
-  );
-}
-
-if (opts.ipop && opts.ipop.length > 1 && opts.scoringCode !== 'ratio') {
-  logger.error('Multiple initial-populations are only supported when using --scoring-code "ratio"');
-  program.help();
-}
-
-if (opts.interactive && opts.elmFile) {
-  logger.error('Interactive mode is only supported with CQL files');
-  program.help();
-}
-
-let deps: string[] = [];
-
-logger.info('Gathering dependencies');
-
-if (opts.deps.length > 0) {
-  deps = opts.deps.map((d: string) => path.resolve(d));
-} else if (opts.depsDirectory) {
-  const depsBasePath = path.resolve(opts.depsDirectory);
-  deps = fs
-    .readdirSync(opts.depsDirectory)
-    .filter(f => {
-      if (opts.elmFile) {
-        return path.extname(f) === '.json' && f !== path.basename(opts.elmFile);
-      } else if (opts.cqlFile) {
-        return path.extname(f) === '.cql' && f !== path.basename(opts.cqlFile);
-      } else {
-        return false;
+      fs.writeFileSync(baseOpts.out, JSON.stringify(newBundle, null, 2));
+      logger.info(`Wrote file to ${baseOpts.out}`);
+    } catch (e) {
+      if (e instanceof Error) {
+        logger.error(e.message);
+        process.exit(1);
       }
-    })
-    .map(f => path.join(depsBasePath, f));
-}
+    }
 
-logger.info(`Successfully gathered ${deps.length} dependencies`);
+    process.exit(0);
+  });
 
-async function main() {
+program
+  .command('make-composite')
+  .description('Combine a set of measures into a composite measure')
+  .addOption(
+    new Option('--composite-scoring <scoring>', 'Composite scoring method of the measure')
+      .choices(compositeScoringCodes)
+      .default('all-or-nothing')
+  )
+  .argument('<path...>')
+  .action(
+    (
+      paths: string[],
+      opts: {
+        compositeScoring: CompositeScoring;
+      }
+    ) => {
+      logger.info(`Making ${paths} into a composite measure bundle`);
+      const baseOpts = program.opts() as BaseOpts;
+
+      try {
+        const bundles = paths.map(p => JSON.parse(fs.readFileSync(p, 'utf8')) as MeasureBundle);
+
+        const measures = bundles.flatMap(
+          b => b.entry?.find(e => e.resource?.resourceType === 'Measure')?.resource as fhir4.Measure
+        );
+
+        const components = measures.map((m, i) => m.id || `measure-${i}`);
+
+        const compositeMeausureResource = generateCompositeMeasureResource(
+          `measure-composite-${measures.map(m => m.id ?? '').join('')}`,
+          baseOpts.canonicalBase,
+          baseOpts.improvementNotation,
+          opts.compositeScoring,
+          components,
+          baseOpts.measureVersion
+        );
+
+        const uniqueSubEntries = bundles
+          .flatMap(b => b.entry ?? [])
+          .filter((e, i, self) => self.findIndex(e2 => e2.resource?.url === e.resource?.url) === i);
+
+        const newBundle: MeasureBundle = {
+          resourceType: 'Bundle',
+          type: 'transaction',
+          entry: [
+            {
+              resource: compositeMeausureResource,
+              request: {
+                method: 'PUT',
+                url: `/Measure/${compositeMeausureResource.id}`
+              }
+            },
+            ...uniqueSubEntries
+          ]
+        };
+
+        fs.writeFileSync(baseOpts.out, JSON.stringify(newBundle, null, 2));
+        logger.info(`Wrote file to ${baseOpts.out}`);
+      } catch (e) {
+        if (e instanceof Error) {
+          logger.error(e.message);
+          process.exit(1);
+        }
+      }
+
+      process.exit(0);
+    }
+  );
+
+program
+  .option('-o, --out <path>', 'Path to output file', './measure-bundle.json')
+  .option(
+    '--canonical-base <url>',
+    'Base URL to use for the canonical URLs of library and measure resources',
+    'http://example.com'
+  )
+  .option('--measure-version <version>', 'Version of the measure resource')
+  .addOption(
+    new Option('--improvement-notation <notation>', "Measure's improvement notation")
+      .choices(improvementNotation)
+      .default('increase')
+  );
+
+program.parse(process.argv);
+
+async function main(opts: CLIOptions, baseOpts: BaseOpts) {
+  if (opts.elmFile && opts.cqlFile) {
+    logger.error('Cannot use both -c/--cql-file and -e/--elm-file\n');
+    program.help();
+  }
+
+  if (!(opts.elmFile || opts.cqlFile)) {
+    logger.error('Must specify one of -c/--cql-file or -e/--elm-file\n');
+    program.help();
+  }
+
+  if (opts.deps.length !== 0 && opts.depsDirectory) {
+    logger.error('Must specify only one of -d/--deps and --deps-directory\n');
+    program.help();
+  }
+
+  if (opts.valuesets === false) {
+    logger.warn(
+      'Configured bundler to not resolve ValueSet resources. Resulting Bundle may be incomplete'
+    );
+  }
+
+  if (opts.ipop && opts.ipop.length > 1 && opts.scoringCode !== 'ratio') {
+    logger.error(
+      'Multiple initial-populations are only supported when using --scoring-code "ratio"'
+    );
+    program.help();
+  }
+
+  if (opts.interactive && opts.elmFile) {
+    logger.error('Interactive mode is only supported with CQL files');
+    program.help();
+  }
+
+  let deps: string[] = [];
+
+  logger.info('Gathering dependencies');
+
+  if (opts.deps.length > 0) {
+    deps = opts.deps.map((d: string) => path.resolve(d));
+  } else if (opts.depsDirectory) {
+    const depsBasePath = path.resolve(opts.depsDirectory);
+    deps = fs
+      .readdirSync(opts.depsDirectory)
+      .filter(f => {
+        if (opts.elmFile) {
+          return path.extname(f) === '.json' && f !== path.basename(opts.elmFile);
+        } else if (opts.cqlFile) {
+          return path.extname(f) === '.cql' && f !== path.basename(opts.cqlFile);
+        } else {
+          return false;
+        }
+      })
+      .map(f => path.join(depsBasePath, f));
+  }
+
+  logger.info(`Successfully gathered ${deps.length} dependencies`);
   let allGroupInfo: GroupInfo[] = [];
   if (opts.interactive) {
     try {
@@ -304,7 +388,7 @@ async function main() {
 
     const groupInfo: GroupInfo = {
       populationBasis: opts.basis,
-      improvementNotation: opts.improvementNotation,
+      improvementNotation: baseOpts.improvementNotation,
       scoring: opts.scoringCode,
       populationCriteria: popCriteria
     };
@@ -397,15 +481,21 @@ async function main() {
   }
 
   const libraryFHIRId = `library-${mainLibraryId}`;
-  const library = generateLibraryResource(libraryFHIRId, mainLibELM, opts.canonicalBase, cqlLookup);
+  const library = generateLibraryResource(
+    libraryFHIRId,
+    mainLibELM,
+    baseOpts.canonicalBase,
+    cqlLookup
+  );
 
   const measureFHIRId = `measure-${mainLibraryId}`;
 
   const measure = generateMeasureResource(
     measureFHIRId,
     libraryFHIRId,
-    opts.canonicalBase,
-    allGroupInfo
+    baseOpts.canonicalBase,
+    allGroupInfo,
+    baseOpts.measureVersion
   );
 
   logger.info('Resolving dependencies/relatedArtifact');
@@ -413,7 +503,7 @@ async function main() {
   const mainLibDeps = getDependencyInfo(mainLibELM);
 
   library.relatedArtifact = [
-    ...mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm, opts.canonicalBase)),
+    ...mainLibDeps.map(dep => generateLibraryRelatedArtifact(dep, elm, baseOpts.canonicalBase)),
     ...getValueSetInfo(mainLibELM).map(vs => generateValueSetRelatedArtifact(vs))
   ];
 
@@ -425,12 +515,12 @@ async function main() {
     ...generateLibraryResource(
       `library-${d.library.identifier.id}`,
       d,
-      opts.canonicalBase,
+      baseOpts.canonicalBase,
       cqlLookup
     ),
     relatedArtifact: [
       ...getDependencyInfo(d).map(dep =>
-        generateLibraryRelatedArtifact(dep, remainingDeps, opts.canonicalBase)
+        generateLibraryRelatedArtifact(dep, remainingDeps, baseOpts.canonicalBase)
       ),
       ...getValueSetInfo(d).map(vs => generateValueSetRelatedArtifact(vs))
     ]
@@ -480,8 +570,3 @@ async function main() {
 
   return generateMeasureBundle([measure, library, ...depLibraries, ...vsResources]);
 }
-
-main().then(bundle => {
-  fs.writeFileSync(opts.out, JSON.stringify(bundle, null, 2), 'utf8');
-  logger.info(`Wrote file to ${opts.out}`);
-});

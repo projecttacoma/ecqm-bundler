@@ -1,5 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { GroupInfo } from '../types/measure';
+import {
+  CompositeScoring,
+  GroupInfo,
+  ImprovementNotation,
+  MeasureBundle,
+  MeasureBundleResourceType
+} from '../types/measure';
 import { ELMIdentification, findELMByIdentifier } from './elm';
 import logger from './logger';
 
@@ -76,17 +82,68 @@ function getPopulationArray(groupInfo: GroupInfo) {
   return populations;
 }
 
-export function generateMeasureResource(
+export function generateCompositeMeasureResource(
   measureId: string,
-  libraryId: string,
   canonicalBase: string,
-  groupInfo: GroupInfo[]
+  improvementNotation: ImprovementNotation,
+  compositeScoring: CompositeScoring,
+  components: string[],
+  measureVersion?: string
 ): fhir4.Measure {
   logger.info(`Creating Measure/${measureId}`);
 
   return {
     resourceType: 'Measure',
     id: measureId,
+    ...(measureVersion && { version: measureVersion }),
+    url: combineURLs(canonicalBase, `/Measure/${measureId}`),
+    status: 'draft',
+    improvementNotation: {
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
+          code: improvementNotation
+        }
+      ]
+    },
+    scoring: {
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/measure-scoring',
+          code: 'composite',
+          display: 'Composite'
+        }
+      ]
+    },
+    compositeScoring: {
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/composite-measure-scoring',
+          code: compositeScoring
+        }
+      ]
+    },
+    relatedArtifact: components.map(c => ({
+      type: 'composed-of',
+      display: c,
+      resource: combineURLs(canonicalBase, `/Measure/${c}`)
+    }))
+  };
+}
+
+export function generateMeasureResource(
+  measureId: string,
+  libraryId: string,
+  canonicalBase: string,
+  groupInfo: GroupInfo[],
+  measureVersion?: string
+): fhir4.Measure {
+  logger.info(`Creating Measure/${measureId}`);
+
+  return {
+    resourceType: 'Measure',
+    id: measureId,
+    ...(measureVersion && { version: measureVersion }),
     url: combineURLs(canonicalBase, `/Measure/${measureId}`),
     status: 'draft',
     library: [combineURLs(canonicalBase, `/Library/${libraryId}`)],
@@ -195,7 +252,7 @@ export function generateValueSetRelatedArtifact(url: string): fhir4.RelatedArtif
   return generateRelatedArtifact(`ValueSet ${url}`, url);
 }
 
-export function generateMeasureBundle(resources: fhir4.FhirResource[]): fhir4.Bundle {
+export function generateMeasureBundle(resources: MeasureBundleResourceType[]): MeasureBundle {
   return {
     resourceType: 'Bundle',
     type: 'transaction',

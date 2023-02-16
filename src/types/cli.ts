@@ -5,17 +5,21 @@ export interface DetailedMeasureObservationOption {
   observingPopulationExpression: string;
 }
 
+export interface BaseOpts {
+  out: string;
+  improvementNotation: ImprovementNotation;
+  canonicalBase: string;
+  measureVersion?: string;
+}
+
 export interface CLIOptions {
   /* Values with defaults */
-  out: string;
   interactive: boolean;
   debug: boolean;
-  improvementNotation: ImprovementNotation;
   scoringCode: ScoringCode;
   basis: string;
   deps: string[];
   translatorUrl: string;
-  canonicalBase: string;
   /* -------------------- */
   cqlFile?: string;
   elmFile?: string;

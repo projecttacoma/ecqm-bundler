@@ -1,5 +1,6 @@
 import {
   combineURLs,
+  generateCompositeMeasureResource,
   generateLibraryResource,
   generateMeasureResource
 } from '../../src/helpers/fhir';
@@ -199,6 +200,79 @@ describe('generateLibraryResource', () => {
           contentType: 'application/elm+json',
           data: expect.any(String)
         }
+      ])
+    );
+  });
+});
+
+describe('generateCompositeMeasureResource', () => {
+  it('should generate proper basic info on composite measure', () => {
+    const measure = generateCompositeMeasureResource(
+      'measure',
+      'http://example.com',
+      'increase',
+      'all-or-nothing',
+      [],
+      '0.0.1'
+    );
+
+    expect(measure).toEqual<fhir4.Measure>({
+      resourceType: 'Measure',
+      id: 'measure',
+      version: '0.0.1',
+      url: 'http://example.com/Measure/measure',
+      status: 'draft',
+      improvementNotation: {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/measure-improvement-notation',
+            code: 'increase'
+          }
+        ]
+      },
+      scoring: {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/measure-scoring',
+            code: 'composite',
+            display: 'Composite'
+          }
+        ]
+      },
+      compositeScoring: {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/composite-measure-scoring',
+            code: 'all-or-nothing'
+          }
+        ]
+      },
+      relatedArtifact: []
+    });
+  });
+
+  it('should generate proper relatedArtifact of composition', () => {
+    const measure = generateCompositeMeasureResource(
+      'measure',
+      'http://example.com',
+      'increase',
+      'all-or-nothing',
+      ['measure-2|1.0.0', 'measure-3|1.0.0'],
+      '0.0.1'
+    );
+
+    expect(measure.relatedArtifact).toBeDefined();
+    expect(measure.relatedArtifact).toHaveLength(2);
+    expect(measure.relatedArtifact).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining<fhir4.RelatedArtifact>({
+          type: 'composed-of',
+          resource: 'http://example.com/Measure/measure-2|1.0.0'
+        }),
+        expect.objectContaining<fhir4.RelatedArtifact>({
+          type: 'composed-of',
+          resource: 'http://example.com/Measure/measure-3|1.0.0'
+        })
       ])
     );
   });

@@ -1,6 +1,21 @@
-export const scoringCodes = ['proportion', 'ratio', 'continuous-variable', 'cohort'] as const;
+export const scoringCodes = [
+  'proportion',
+  'ratio',
+  'continuous-variable',
+  'cohort',
+  'composite'
+] as const;
 
 export type ScoringCode = typeof scoringCodes[number];
+
+export const compositeScoringCodes = [
+  'opportunity',
+  'all-or-nothing',
+  'linear',
+  'weighted'
+] as const;
+
+export type CompositeScoring = typeof compositeScoringCodes[number];
 
 export const improvementNotation = ['increase', 'decrease'] as const;
 
@@ -48,3 +63,6 @@ export interface GroupInfo {
   populationBasis: string;
   populationCriteria: GroupPopulationCriteria;
 }
+
+export type MeasureBundleResourceType = fhir4.Measure | fhir4.ValueSet | fhir4.Library;
+export type MeasureBundle = fhir4.Bundle<MeasureBundleResourceType>;
