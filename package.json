@@ -1,6 +1,6 @@
 {
   "name": "ecqm-bundler",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "CLI for bundling FHIR-based eCQMs",
   "main": "dist/index.js",
   "bin": {
