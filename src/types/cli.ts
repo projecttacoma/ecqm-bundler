@@ -5,6 +5,12 @@ export interface DetailedMeasureObservationOption {
   observingPopulationExpression: string;
 }
 
+export interface DetailedCompositeMeasureComponent {
+  measureSlug: string;
+  groupId?: string;
+  weight?: number;
+}
+
 export interface BaseOpts {
   out: string;
   improvementNotation: ImprovementNotation;

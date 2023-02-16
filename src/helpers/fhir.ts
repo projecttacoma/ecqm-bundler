@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { DetailedCompositeMeasureComponent } from '../types/cli';
 import {
   CompositeScoring,
   GroupInfo,
@@ -87,7 +88,7 @@ export function generateCompositeMeasureResource(
   canonicalBase: string,
   improvementNotation: ImprovementNotation,
   compositeScoring: CompositeScoring,
-  components: string[],
+  components: DetailedCompositeMeasureComponent[],
   measureVersion?: string
 ): fhir4.Measure {
   logger.info(`Creating Measure/${measureId}`);
@@ -123,12 +124,39 @@ export function generateCompositeMeasureResource(
         }
       ]
     },
-    relatedArtifact: components.map(c => ({
-      type: 'composed-of',
-      display: c,
-      resource: combineURLs(canonicalBase, `/Measure/${c}`)
-    }))
+    relatedArtifact: components.map(c => makeCompositeRelatedArtifact(c, canonicalBase))
   };
+}
+
+function makeCompositeRelatedArtifact(
+  componentInfo: DetailedCompositeMeasureComponent,
+  canonicalBase: string
+): fhir4.RelatedArtifact {
+  const ra: fhir4.RelatedArtifact = {
+    type: 'composed-of',
+    display: componentInfo.measureSlug,
+    resource: combineURLs(canonicalBase, `/Measure/${componentInfo.measureSlug}`)
+  };
+
+  if (componentInfo.groupId || componentInfo.weight) {
+    ra.extension = [];
+
+    if (componentInfo.groupId) {
+      ra.extension.push({
+        url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-groupId',
+        valueString: componentInfo.groupId
+      });
+    }
+
+    if (componentInfo.weight) {
+      ra.extension.push({
+        url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-weight',
+        valueDecimal: componentInfo.weight
+      });
+    }
+  }
+
+  return ra;
 }
 
 export function generateMeasureResource(

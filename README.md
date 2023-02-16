@@ -210,6 +210,19 @@ ecqm-bundler make-composite /path/to/bundle1.json /path/to/bundle2.json /path/to
 
 This will generate a new bundle `composite.json` whose main measure is a composite measure that references the measures that it is composed of in the `relatedArtifact` list
 
+To customize the group ID or weight of one of the components, use the `--detailed-component` option, and be sure to follow the proper string format. For example:
+
+```bash
+ecqm-bundler make-composite <...> --detailed-component "MyMeasure#group-1" # just measure and group
+ecqm-bundler make-composite <...> --detailed-component "MyMeasure|1.0.0#group-1" # measure version and group
+ecqm-bundler make-composite <...> --detailed-component "MyMeasure#group-1#0.1" # measure group and weight
+ecqm-bundler make-composite <...> --detailed-component "MyMeasure##0.1" # just measure and weight
+```
+
+Note that the measure identifying info is required, but group ID and weight are both optional.
+
+:warning: Use of this option will override the autodetection of canonicals that happens in the component measures. Please ensure that the measure identifying info you provide matches the canonical in the corresponding measure resource :warning:
+
 ```
 Usage: ecqm-bundler make-composite [options] <path...>
 
@@ -217,6 +230,7 @@ Combine a set of measures into a composite measure
 
 Options:
   --composite-scoring <scoring>  Composite scoring method of the measure (choices: "opportunity", "all-or-nothing", "linear", "weighted", default: "all-or-nothing")
+  --detailed-component <component...>  Specify measure components with specific group IDs or weights. Format "measureId(|version)?(#groupId)?(#weight)?" (e.g. "measure|1.0.0#group-2#0.1") (default: [])
   -h, --help                     display help for command
 ```
 

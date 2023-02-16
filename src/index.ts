@@ -29,7 +29,12 @@ import {
   MeasureBundle,
   scoringCodes
 } from './types/measure';
-import { BaseOpts, CLIOptions, DetailedMeasureObservationOption } from './types/cli';
+import {
+  BaseOpts,
+  CLIOptions,
+  DetailedCompositeMeasureComponent,
+  DetailedMeasureObservationOption
+} from './types/cli';
 import { getPopulationConstraintErrors } from './helpers/ecqm';
 import { collectInteractiveInput } from './cli/interactive';
 import { findReferencedPopulation, makeSimplePopulationCriteria } from './cli/populations';
@@ -156,12 +161,31 @@ program
       .choices(compositeScoringCodes)
       .default('all-or-nothing')
   )
+  .option(
+    '--detailed-component <component...>',
+    'Specify measure components with specific group IDs or weights. Format "measureId(|version)?(#groupId)?(#weight)?" (e.g. "measure|1.0.0#group-2#0.1")',
+    (val, current: DetailedCompositeMeasureComponent[]) => {
+      const [measureSlug, groupId, weight] = val.split('#');
+      return current.concat([
+        {
+          measureSlug,
+          ...(groupId &&
+            groupId !== '' && {
+              groupId: groupId
+            }),
+          ...(weight && { weight: parseFloat(weight) })
+        }
+      ]);
+    },
+    []
+  )
   .argument('<path...>')
   .action(
     (
       paths: string[],
       opts: {
         compositeScoring: CompositeScoring;
+        detailedComponent: DetailedCompositeMeasureComponent[];
       }
     ) => {
       logger.info(`Making ${paths} into a composite measure bundle`);
@@ -174,7 +198,10 @@ program
           b => b.entry?.find(e => e.resource?.resourceType === 'Measure')?.resource as fhir4.Measure
         );
 
-        const components = measures.map((m, i) => m.id || `measure-${i}`);
+        const components =
+          opts.detailedComponent.length === 0
+            ? measures.map((m, i) => ({ measureSlug: m.id || `measure-${i}` }))
+            : opts.detailedComponent;
 
         const compositeMeausureResource = generateCompositeMeasureResource(
           `measure-composite-${measures.map(m => m.id ?? '').join('')}`,

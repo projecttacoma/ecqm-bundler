@@ -251,13 +251,13 @@ describe('generateCompositeMeasureResource', () => {
     });
   });
 
-  it('should generate proper relatedArtifact of composition', () => {
+  it('should generate proper relatedArtifact of composition with simple slugs', () => {
     const measure = generateCompositeMeasureResource(
       'measure',
       'http://example.com',
       'increase',
       'all-or-nothing',
-      ['measure-2|1.0.0', 'measure-3|1.0.0'],
+      [{ measureSlug: 'measure-2|1.0.0' }, { measureSlug: 'measure-3|1.0.0' }],
       '0.0.1'
     );
 
@@ -272,6 +272,62 @@ describe('generateCompositeMeasureResource', () => {
         expect.objectContaining<fhir4.RelatedArtifact>({
           type: 'composed-of',
           resource: 'http://example.com/Measure/measure-3|1.0.0'
+        })
+      ])
+    );
+  });
+
+  it('should generate groupId extension on artifact when provided', () => {
+    const measure = generateCompositeMeasureResource(
+      'measure',
+      'http://example.com',
+      'increase',
+      'all-or-nothing',
+      [{ measureSlug: 'measure-2|1.0.0', groupId: 'group-1' }],
+      '0.0.1'
+    );
+
+    expect(measure.relatedArtifact).toBeDefined();
+    expect(measure.relatedArtifact).toHaveLength(1);
+    expect(measure.relatedArtifact).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining<fhir4.RelatedArtifact>({
+          type: 'composed-of',
+          resource: 'http://example.com/Measure/measure-2|1.0.0',
+          extension: [
+            {
+              url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-groupId',
+              valueString: 'group-1'
+            }
+          ]
+        })
+      ])
+    );
+  });
+
+  it('should generate weight extension on artifact when provided', () => {
+    const measure = generateCompositeMeasureResource(
+      'measure',
+      'http://example.com',
+      'increase',
+      'all-or-nothing',
+      [{ measureSlug: 'measure-2|1.0.0', weight: 0.1 }],
+      '0.0.1'
+    );
+
+    expect(measure.relatedArtifact).toBeDefined();
+    expect(measure.relatedArtifact).toHaveLength(1);
+    expect(measure.relatedArtifact).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining<fhir4.RelatedArtifact>({
+          type: 'composed-of',
+          resource: 'http://example.com/Measure/measure-2|1.0.0',
+          extension: [
+            {
+              url: 'http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-weight',
+              valueDecimal: 0.1
+            }
+          ]
         })
       ])
     );
