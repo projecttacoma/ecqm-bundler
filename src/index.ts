@@ -224,7 +224,7 @@ program
               resource: compositeMeausureResource,
               request: {
                 method: 'PUT',
-                url: `/Measure/${compositeMeausureResource.id}`
+                url: `Measure/${compositeMeausureResource.id}`
               }
             },
             ...uniqueSubEntries
