@@ -118,6 +118,38 @@ describe('generateMeasureResource', () => {
       }
     ]);
   });
+
+  it('should include SDE definition when expression is provided', () => {
+    const measure = generateMeasureResource(
+      'measure',
+      'library',
+      'http://example.com',
+      [],
+      undefined,
+      ['SDE Payer']
+    );
+
+    expect(measure.supplementalData).toBeDefined();
+    expect(measure.supplementalData).toEqual<fhir4.MeasureSupplementalData[]>([
+      {
+        id: expect.any(String),
+        usage: [
+          {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/measure-data-usage',
+                code: 'supplemental-data'
+              }
+            ]
+          }
+        ],
+        criteria: {
+          language: 'text/cql-identifier',
+          expression: 'SDE Payer'
+        }
+      }
+    ]);
+  });
 });
 
 describe('combineURLs', () => {

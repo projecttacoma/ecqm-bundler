@@ -92,6 +92,14 @@ and the [Measure Scoring Code](https://build.fhir.org/ig/HL7/cqf-measures/Struct
 ecqm-bundler generate -c /path/to/main/cql/file.cql --deps-directory /path/to/deps/directory -v /path/to/valueset/directory --scoring-code proportion --improvement-notation increase --basis boolean <...>
 ```
 
+### Supplemental Data Elements
+
+To add [Supplemental Data Elements (SDEs)](https://build.fhir.org/ig/HL7/cqf-measures/measure-conformance.html#supplemental-data-elements) to a Measure, simple include expression name(s) using the `--sde` flag:
+
+```bash
+ecqm-bundler generate <...> --sde "SDE 1 Expression Name" "SDE 2 Expression Name" "..."
+```
+
 ### ValueSet Resolution
 
 By default, the bundler will look in the directory specified by `-v/--valueset` for any JSON files that have a `url` property which matches what is included by any pieces of the CQL logic.

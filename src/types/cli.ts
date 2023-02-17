@@ -30,6 +30,7 @@ export interface CLIOptions {
   cqlFile?: string;
   elmFile?: string;
   depsDirectory?: string;
+  sde?: string[];
   ipop?: string[];
   numer?: string;
   numex?: string;

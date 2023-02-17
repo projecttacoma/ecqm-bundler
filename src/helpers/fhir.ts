@@ -164,7 +164,8 @@ export function generateMeasureResource(
   libraryId: string,
   canonicalBase: string,
   groupInfo: GroupInfo[],
-  measureVersion?: string
+  measureVersion?: string,
+  supplementalData?: string[]
 ): fhir4.Measure {
   logger.info(`Creating Measure/${measureId}`);
 
@@ -175,6 +176,26 @@ export function generateMeasureResource(
     url: combineURLs(canonicalBase, `/Measure/${measureId}`),
     status: 'draft',
     library: [combineURLs(canonicalBase, `/Library/${libraryId}`)],
+    ...(supplementalData &&
+      supplementalData.length > 0 && {
+        supplementalData: supplementalData.map(expr => ({
+          id: uuidv4(),
+          usage: [
+            {
+              coding: [
+                {
+                  system: 'http://terminology.hl7.org/CodeSystem/measure-data-usage',
+                  code: 'supplemental-data'
+                }
+              ]
+            }
+          ],
+          criteria: {
+            language: 'text/cql-identifier',
+            expression: expr
+          }
+        }))
+      }),
     group: groupInfo.map(gi => {
       const group: fhir4.MeasureGroup = {
         id: uuidv4(),
