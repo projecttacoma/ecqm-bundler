@@ -2,6 +2,22 @@
 
 CLI for bundling CQL files as an eCQM FHIR Bundle.
 
+- [Basic Measure Bundle Generation from CQL](#basic-usage)
+  - [Customizing Population Expressions](#customizing-population-expressions)
+  - [Dealing with CQL Dependencies](#dependencies)
+  - [Customizing Measure Properties](#customizing-measure-properties)
+  - [Supplemental Data Elements](#supplemental-data-elements)
+  - [Risk Adjustment Variables](#risk-adjustment-variables)
+  - [ValueSet Resolution](#valueset-resolution)
+  - [Customizing Canonical URLs](#customizing-canonical-urls)
+  - [Bundling from ELM Content](#bundling-from-elm-content)
+- [Advanced Usage](#advanced-usagefeatures)
+  - [Interactive Mode](#interactive-mode)
+  - [Multiple Initial Populations](#multiple-initial-populations)
+  - [Multiple Measure Observations](#multiple-measure-observations)
+  - [Multiple Measure Groups](#multiple-measure-groups)
+  - [Composite Measures](#composite-measures)
+
 # Installation
 
 The CLI can be globally installed through npm:
@@ -67,13 +83,13 @@ ecqm-bundler generate -c /path/to/main/cql/file.cql --deps-directory /path/to/de
 
 If your CQL depends on other cql (i.e. it uses an `include <otherlib> ...` statement, that CQL must be passed in to the CLI as well via either the `--deps` or `--deps-directory` arguments:
 
-### Individual Dependency List
+#### Individual Dependency List
 
 ```bash
 ecqm-bundler generate -c /path/to/main/cql/file.cql --deps /path/to/dep1.cql /path/to/dep2.cql -v /path/to/valueset/directory --ipop <ipp-cql-expression> --numer <numer-cql-expression> --denom <denom-cql-expression>
 ```
 
-### Dependency Directory
+#### Dependency Directory
 
 ```bash
 ecqm-bundler generate -c /path/to/main/cql/file.cql --deps-directory /path/to/deps/directory -v /path/to/valueset/directory --ipop <ipp-cql-expression> --numer <numer-cql-expression> --denom <denom-cql-expression>
