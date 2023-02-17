@@ -159,13 +159,67 @@ function makeCompositeRelatedArtifact(
   return ra;
 }
 
+function makeSupplementalData(
+  supplementalData?: string[],
+  riskAdjustmentFactors?: string[]
+): fhir4.MeasureSupplementalData[] {
+  const sdes: fhir4.MeasureSupplementalData[] = [];
+
+  if (supplementalData && supplementalData.length > 0) {
+    supplementalData.forEach(sde => {
+      sdes.push({
+        id: uuidv4(),
+        usage: [
+          {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/measure-data-usage',
+                code: 'supplemental-data'
+              }
+            ]
+          }
+        ],
+        criteria: {
+          language: 'text/cql-identifier',
+          expression: sde
+        }
+      });
+    });
+  }
+
+  if (riskAdjustmentFactors && riskAdjustmentFactors.length > 0) {
+    riskAdjustmentFactors.forEach(raf => {
+      sdes.push({
+        id: uuidv4(),
+        usage: [
+          {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/measure-data-usage',
+                code: 'risk-adjustment-factor'
+              }
+            ]
+          }
+        ],
+        criteria: {
+          language: 'text/cql-identifier',
+          expression: raf
+        }
+      });
+    });
+  }
+
+  return sdes;
+}
+
 export function generateMeasureResource(
   measureId: string,
   libraryId: string,
   canonicalBase: string,
   groupInfo: GroupInfo[],
   measureVersion?: string,
-  supplementalData?: string[]
+  supplementalData?: string[],
+  riskAdjustmentFactors?: string[]
 ): fhir4.Measure {
   logger.info(`Creating Measure/${measureId}`);
 
@@ -176,26 +230,7 @@ export function generateMeasureResource(
     url: combineURLs(canonicalBase, `/Measure/${measureId}`),
     status: 'draft',
     library: [combineURLs(canonicalBase, `/Library/${libraryId}`)],
-    ...(supplementalData &&
-      supplementalData.length > 0 && {
-        supplementalData: supplementalData.map(expr => ({
-          id: uuidv4(),
-          usage: [
-            {
-              coding: [
-                {
-                  system: 'http://terminology.hl7.org/CodeSystem/measure-data-usage',
-                  code: 'supplemental-data'
-                }
-              ]
-            }
-          ],
-          criteria: {
-            language: 'text/cql-identifier',
-            expression: expr
-          }
-        }))
-      }),
+    supplementalData: makeSupplementalData(supplementalData, riskAdjustmentFactors),
     group: groupInfo.map(gi => {
       const group: fhir4.MeasureGroup = {
         id: uuidv4(),

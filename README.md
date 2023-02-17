@@ -94,10 +94,18 @@ ecqm-bundler generate -c /path/to/main/cql/file.cql --deps-directory /path/to/de
 
 ### Supplemental Data Elements
 
-To add [Supplemental Data Elements (SDEs)](https://build.fhir.org/ig/HL7/cqf-measures/measure-conformance.html#supplemental-data-elements) to a Measure, simple include expression name(s) using the `--sde` flag:
+To add [Supplemental Data Elements (SDEs)](https://build.fhir.org/ig/HL7/cqf-measures/measure-conformance.html#supplemental-data-elements) to a Measure, simply include expression name(s) using the `--sde` flag:
 
 ```bash
 ecqm-bundler generate <...> --sde "SDE 1 Expression Name" "SDE 2 Expression Name" "..."
+```
+
+### Risk Adjustment Variables
+
+To add [Risk Adjustment Variables](https://build.fhir.org/ig/HL7/cqf-measures/measure-conformance.html#risk-adjustment) to a Measure, simply include expression name(s) using the `--raf` flag:
+
+```bash
+ecqm-bundler generate <...> --raf "RAF 1 Expression Name" "RAF 2 Expression Name" "..."
 ```
 
 ### ValueSet Resolution

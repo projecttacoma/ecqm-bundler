@@ -31,6 +31,7 @@ export interface CLIOptions {
   elmFile?: string;
   depsDirectory?: string;
   sde?: string[];
+  raf?: string[];
   ipop?: string[];
   numer?: string;
   numex?: string;

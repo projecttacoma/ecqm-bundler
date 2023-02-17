@@ -61,6 +61,7 @@ program
   )
   .option('--deps-directory <path>', 'Directory containing all dependent CQL or ELM files')
   .option('--sde <sde...>', 'Supplemental Data Element expression(s) used in the measure')
+  .option('--raf <raf...>', 'Risk Adjustment Variable expression(s) used in the measure')
   .option(
     '--ipop <expr...>',
     '"initial-Population" expression name(s) of measure (enter multiple values for a multiple ipp ratio measure)'
@@ -524,7 +525,8 @@ async function main(opts: CLIOptions, baseOpts: BaseOpts) {
     baseOpts.canonicalBase,
     allGroupInfo,
     baseOpts.measureVersion,
-    opts.sde
+    opts.sde,
+    opts.raf
   );
 
   logger.info('Resolving dependencies/relatedArtifact');

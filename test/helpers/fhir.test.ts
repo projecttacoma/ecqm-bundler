@@ -150,6 +150,39 @@ describe('generateMeasureResource', () => {
       }
     ]);
   });
+
+  it('should include risk adjustment variable expressions when provided', () => {
+    const measure = generateMeasureResource(
+      'measure',
+      'library',
+      'http://example.com',
+      [],
+      undefined,
+      undefined,
+      ['RAF']
+    );
+
+    expect(measure.supplementalData).toBeDefined();
+    expect(measure.supplementalData).toEqual<fhir4.MeasureSupplementalData[]>([
+      {
+        id: expect.any(String),
+        usage: [
+          {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/measure-data-usage',
+                code: 'risk-adjustment-factor'
+              }
+            ]
+          }
+        ],
+        criteria: {
+          language: 'text/cql-identifier',
+          expression: 'RAF'
+        }
+      }
+    ]);
+  });
 });
 
 describe('combineURLs', () => {
