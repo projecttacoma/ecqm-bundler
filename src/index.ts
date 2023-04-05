@@ -42,7 +42,7 @@ import { combineGroups } from './cli/combine-groups';
 
 const program = new Command();
 
-program.version('v0.4.0');
+program.version('v0.4.1');
 
 program
   .command('generate', { isDefault: true })
