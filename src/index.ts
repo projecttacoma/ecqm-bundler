@@ -561,7 +561,7 @@ async function main(opts: CLIOptions, baseOpts: BaseOpts) {
 
   if (opts.valuesets !== false) {
     logger.info(`Resolving ValueSets`);
-    const allValueSets = elm.map(e => getValueSetInfo(e)).flat();
+    const allValueSets = [...new Set(elm.map(e => getValueSetInfo(e)).flat())];
 
     if (allValueSets.length > 0) {
       if (!opts.valuesets) {
